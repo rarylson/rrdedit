@@ -19,66 +19,98 @@ use RRDs;
 
 # Usage
 sub usage {
-	print "Usage: $0 --file filename.rrd --delete dsname1 [--delete dsname2 ...] [--ignore]\n";
-	print "   or: $0 --file filename.rrd --delete dsname1,dsname2,... [--ignore]\n";
-	print "   or: $0 --file filename.rrd --print\n";
+	print "Usage: $0 <subcommand> ...\n";
+	print "       where: <subcommand> = add-ds|delete-ds|rename-ds|print-ds|\n" . 
+          "                             add-rra|delete-rra|resize-rra|print-rra\n";
+	print "For a complete help, use: $0 --help\n";
 }
+
+# Help
+sub help {
+    print "BAD NEWS: We not implemented 'help' yet. :(\n";
+}
+
+# Recovery RRD
+# After some RRD::Editor operations, the RRD could be with a header
+# inconsistent. For example, the delete_DS command may corrupt the size value of
+# the header.
+# In these cases, dump and restore the RRD recovery the RRD database. 
+sub recovery {
+    local($file) = $_[0];
+    # XML file for recovery purpose
+    my $file_xml = $file;
+    $file_xml =~ s/\.rrd/\.xml/;
+    RRDs::dump($file, $file_xml);
+    unlink($file);
+    RRDs::restore($file_xml, $file);
+    unlink($file_xml);
+}
+
+# At least one argument
 if ($#ARGV eq -1) {
     usage();
 	exit 1;
 } 
 
-# Parsing
-my $file = '';
-my $delete = '';
-my $ignore = '';
+# Help and usage
 my $help = '';
-my $print = '';
-GetOptions ('help' => \$help, 'print' => \$print, 'file=s' => \$file, 'delete=s' => \@delete, 'ignore' => \$ignore);
-@delete = split(/,/,join(',',@delete));
-usage() and exit 0 if $help;
+my $usage = '';
+GetOptions ('help' => \$help, 'usage' => \$usage);
+help() and exit 0 if $help;
+usage() and exit 0 if $usage;
 
-# Error while parsing
-if ($print and !$file) {
-	print "Syntax error. You must pass one file to print dsnames.\n";
-	usage();
-	exit 1;
-} elsif (!$print and (!$file or !@delete)) {
-	print "Syntax error. You must pass one file and one or more dsnames to be deleted.\n";
-	usage();
-	exit 1;
-}
+# Parse
+@validcommands = ("add-ds", "delete-ds", "rename-ds", "print-ds", "add-rra", "delete-rra", "rename-rra", "print-rra");
+my $command = $ARGV[0];
+print "Invalid command name.\n" and usage() and exit 1 if ! grep $_ eq $command, @validcommands;
+
+# Parse vars
+my $file = '';
+my $names = '';
+my $ignore = '';
+my $old = '';
+my $new = '';
+# [DS:ds-name:DST:heartbeat:min:max] 
+GetOptions ('file=s' => \$file, 'names=s' => \@names, 'ignore' => \$ignore, 'old' => \$old, 'new' => \$new);
+@names = split(/,/,join(',',@names));
+
+# Error
+print "Syntax error. You must pass one file as argument.\n" and usage() and
+        exit 1 if !$file;
 
 # Open RRD
 my $rrd = RRD::Editor->new();
 $rrd->open($file);
 
-# Print
-if ($print) {
+# Print data sources
+if ($command eq "print-ds") {
+    # Print
 	my @dsnames = $rrd->DS_names();
 	print "DS names: @dsnames\n";
-	exit 0;
+	$rrd->close();
+    exit 0;
+}    
+
+# Delete data sources
+if ($command eq "delete-ds") {
+    # Error
+	print "Syntax error. You must pass one or more data source names to be deleted.\n" and usage() and
+            exit 1 if !@names;
+    # Deleting
+    print "Deleting: @names...\n";
+    foreach my $dsname (@names) {
+        # If ignore was setted, not die if a dsname does not exist.
+        # See: http://affy.blogspot.com.br/p5be/ch13.htm
+        eval{$rrd->delete_DS($dsname);};
+        die "DS '$dsname' does not exists\n" if $@ and !$ignore;
+    }
+    $rrd->save();
+    $rrd->close();
+    # After RRD::Editor->delete_DS, the RRD header was inconsistent, with a wrong size.
+    # So, recovery RRD usind dump+restore
+    recovery($file);
+    print "All DS deleted\n";
+    exit 0;
 }
 
-# Deleting DS from RRD
-print "Deleting DS: @delete\n";
-foreach my $dsname (@delete) {
-	# Error handling
-	# See: http://affy.blogspot.com.br/p5be/ch13.htm
-	eval{$rrd->delete_DS($dsname);};
-	die "DS '$dsname' does not exists\n" if $@ and !$ignore;
-}
-$rrd->save();
-$rrd->close();
-
-# XXX There is a BUG in delete_DS that not update the size header.
-#     Dump and restore the RRD will correct the size field.
-my $file_xml = $file;
-$file_xml =~ s/\.rrd/\.xml/;
-RRDs::dump($file, $file_xml);
-unlink($file);
-RRDs::restore($file_xml, $file);
-unlink($file_xml);
-
-print "All DS deleted\n";
 
