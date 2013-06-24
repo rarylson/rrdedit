@@ -2,10 +2,6 @@
 #
 # Remove data sources from a file
 #
-# Dependences
-#     cpan install ExtUtils::MakeMaker
-#     cpan install RRD::Editor
-#
 # Note: To install rrdtool bind for python:
 #     apt-get install libcairo2-dev libpango1.0-dev libglib2.0-dev libxml2-dev librrd-dev
 #     pip install python-rrdtool
@@ -15,8 +11,6 @@
 #      http://www.cs.mcgill.ca/~abatko/computers/programming/perl/howto/getopts/
 #      http://search.cpan.org/~dougleith/RRD-Editor/lib/RRD/Editor.pm
 #      http://oss.oetiker.ch/rrdtool/prog/RRDs.en.html
-#
-# TODO Impove this script to a command line interface to RRD::Editor
 #
 
 use Getopt::Long;
@@ -29,6 +23,10 @@ sub usage {
 	print "   or: $0 --file filename.rrd --delete dsname1,dsname2,... [--ignore]\n";
 	print "   or: $0 --file filename.rrd --print\n";
 }
+if ($#ARGV eq -1) {
+    usage();
+	exit 1;
+} 
 
 # Parsing
 my $file = '';
@@ -41,10 +39,7 @@ GetOptions ('help' => \$help, 'print' => \$print, 'file=s' => \$file, 'delete=s'
 usage() and exit 0 if $help;
 
 # Error while parsing
-if ($#ARGV eq -1) {
-	usage();
-	exit 1;
-} elsif ($print and !$file) {
+if ($print and !$file) {
 	print "Syntax error. You must pass one file to print dsnames.\n";
 	usage();
 	exit 1;
