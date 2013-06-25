@@ -1,11 +1,7 @@
 #!/usr/bin/env perl
 #
-# Remove data sources from a file
+# Edit RRDs. Edit data sources and RRA from a RRD file.
 #
-# Note: To install rrdtool bind for python:
-#     apt-get install libcairo2-dev libpango1.0-dev libglib2.0-dev libxml2-dev librrd-dev
-#     pip install python-rrdtool
-# 
 # To understand this code
 # See: http://perldoc.perl.org/Getopt/Long.html#Simple-options
 #      http://www.cs.mcgill.ca/~abatko/computers/programming/perl/howto/getopts/
@@ -66,12 +62,13 @@ print "Invalid command name.\n" and usage() and exit 1 if ! grep $_ eq $command,
 
 # Parse vars
 my $file = '';
+my $full = '';
 my $names = '';
 my $ignore = '';
 my $old = '';
 my $new = '';
 # [DS:ds-name:DST:heartbeat:min:max] 
-GetOptions ('file=s' => \$file, 'names=s' => \@names, 'ignore' => \$ignore, 'old' => \$old, 'new' => \$new);
+GetOptions ('file=s' => \$file, 'full' => \$full, 'names=s' => \@names, 'ignore' => \$ignore, 'old' => \$old, 'new' => \$new);
 @names = split(/,/,join(',',@names));
 
 # Error
@@ -85,8 +82,15 @@ $rrd->open($file);
 # Print data sources
 if ($command eq "print-ds") {
     # Print
-	my @dsnames = $rrd->DS_names();
-	print "DS names: @dsnames\n";
+    my @dsnames = $rrd->DS_names();
+    print "DS names: @dsnames\n";
+    # Print full
+    if ($full) {
+        my @infos = split /\n/, $rrd->info();
+        foreach $info (@infos) {
+            print "$info\n" if $info =~ /^ds/;
+        }
+    }
 	$rrd->close();
     exit 0;
 }    
@@ -98,7 +102,7 @@ if ($command eq "delete-ds") {
             exit 1 if !@names;
     # Deleting
     print "Deleting: @names...\n";
-    foreach my $dsname (@names) {
+    foreach $dsname (@names) {
         # If ignore was setted, not die if a dsname does not exist.
         # See: http://affy.blogspot.com.br/p5be/ch13.htm
         eval{$rrd->delete_DS($dsname);};
@@ -113,4 +117,28 @@ if ($command eq "delete-ds") {
     exit 0;
 }
 
+# Print RRAs
+if ($command eq "print-rra") {
+    # Print
+    my $num_rra = $rrd->num_RRAs();
+    my $minstep = $rrd->minstep();
+    print "Number of RRAs: $num_rra\n";
+    print "Minimum step size: $minstep\n";
+    # RRAs doesn't have names. They're indexed from 0 to num_RRAs()-1.
+    # Print number of rows foreach RRA
+    # See: http://search.cpan.org/~dougleith/RRD-Editor/lib/RRD/Editor.pm#num_RRAs
+    foreach $i (0 .. $num_rra-1) {
+        printf "RRA %s:\n\tStep: %s\n\tRows: %s\n", $i, $rrd->RRA_step($i), $rrd->RRA_numrows($i);
+        my $totaltime = $rrd->RRA_step($i) * $rrd->RRA_numrows($i);
+        printf "\tTotal time: %d seconds (%d hours)\n", $totaltime, $totaltime / 3600;
+    }
+    if ($full) {
+        my @infos = split /\n/, $rrd->info();
+        foreach $info (@infos) {
+            print "$info\n" if $info =~ /^rra/;
+        }
+    }
+	$rrd->close();
+    exit 0;
+}    
 
