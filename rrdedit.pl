@@ -132,6 +132,7 @@ if ($command eq "print-rra") {
         my $totaltime = $rrd->RRA_step($i) * $rrd->RRA_numrows($i);
         printf "\tTotal time: %d seconds (%d hours)\n", $totaltime, $totaltime / 3600;
     }
+    # Print full
     if ($full) {
         my @infos = split /\n/, $rrd->info();
         foreach $info (@infos) {
@@ -141,4 +142,22 @@ if ($command eq "print-rra") {
 	$rrd->close();
     exit 0;
 }    
+
+# Resize RRAs
+if ($command eq "resize-rra") {
+    # This must be done manually
+    # According to RRD::Editor, "changing the step size is hard as it would require resampling the data stored in the RRA".
+    # So, they "leave this 'to do'".
+    # See: http://search.cpan.org/~dougleith/RRD-Editor/lib/RRD/Editor.pm#RRA_step
+
+    # How can we implement this?
+    # See: RRA_STEP.md
+
+    print "BAD NEWS. We not implemented this feature yet. We're studying it now!\n";
+    exit 0;
+}
+
+# Command not implemented yet
+print "BAD NEWS. We not implemented this feature yet.\n";
+exit 0;
 
