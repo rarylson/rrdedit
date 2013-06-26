@@ -1,8 +1,8 @@
-RRA change Step Notes
-=====================
+How can I change RRA step?
+==========================
 
-Tests in RRD
-------------
+Tests using RRD Tool
+--------------------
 
 It works:
 
@@ -55,11 +55,15 @@ I propose two solutions:
 
 ### With new RRAs, and a cron task
 
+Do this:
+
 - Add a new RRA to replace the old one;
 - Print a crontab job to run after the new RRA to be filled
 
 
 ### With interpolation
+
+Do this:
 
 - Foreach RRA, get the real values using fetch, and remember it id;
 - Add a new RRA and remember it id too;
