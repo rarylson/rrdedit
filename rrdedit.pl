@@ -8,16 +8,19 @@
 #      http://search.cpan.org/~dougleith/RRD-Editor/lib/RRD/Editor.pm
 #      http://oss.oetiker.ch/rrdtool/prog/RRDs.en.html
 #
+# TODO Consider change array lenght to "scalar @array"
 
 use Getopt::Long;
 use RRD::Editor;
 use RRDs;
+use Math::Interpolator::Robust;
+use Math::Interpolator::Knot;
 
 # Usage
 sub usage {
 	print "Usage: $0 <subcommand> ...\n";
 	print "       where: <subcommand> = add-ds|delete-ds|rename-ds|print-ds|\n" . 
-          "                             add-rra|delete-rra|resize-rra|print-rra\n";
+          "                             add-rra|delete-rra|resize-rows-rra|resize-step-rra|print-rra\n";
 	print "For a complete help, use: $0 --help\n";
 }
 
@@ -56,20 +59,33 @@ help() and exit 0 if $help;
 usage() and exit 0 if $usage;
 
 # Parse
-@validcommands = ("add-ds", "delete-ds", "rename-ds", "print-ds", "add-rra", "delete-rra", "rename-rra", "print-rra");
+@validcommands = ("add-ds", "delete-ds", "rename-ds", "print-ds", "add-rra", "delete-rra", "resize-rows-rra", 
+        "resize-step-rra", "print-rra");
 my $command = $ARGV[0];
 print "Invalid command name.\n" and usage() and exit 1 if ! grep $_ eq $command, @validcommands;
 
 # Parse vars
 my $file = '';
 my $full = '';
+my $name = '';
 my $names = '';
 my $ignore = '';
 my $old = '';
 my $new = '';
-# [DS:ds-name:DST:heartbeat:min:max] 
-GetOptions ('file=s' => \$file, 'full' => \$full, 'names=s' => \@names, 'ignore' => \$ignore, 'old' => \$old, 'new' => \$new);
-@names = split(/,/,join(',',@names));
+my $string = '';
+my $id = '';
+my $ids = '';
+my $torows = '';
+my $tostep = '';
+my $with_add = '';
+my $with_step = '';
+my $with_interpolation = '';
+GetOptions ('file=s' => \$file, 'full' => \$full, 'name=s' => \$name, 'ignore' => \$ignore, 'old=s' => \$old, 'new=s' => \$new, 
+        'id=s' => \$id, 'torows=i' => \$torows, 'tostep=i' => \$tostep, 'with-add' => \$with_add, 'with-step' => \$with_step, 
+        'with-interpolation' => \$with_interpolation);
+@names = split(/,/,$name);
+@ids = split(/,/,$id);
+
 
 # Error
 print "Syntax error. You must pass one file as argument.\n" and usage() and
@@ -110,7 +126,7 @@ if ($command eq "delete-ds") {
     }
     $rrd->save();
     $rrd->close();
-    # After RRD::Editor->delete_DS, the RRD header was inconsistent, with a wrong size.
+    # After RRD::Editor->delete_DS, the RRD header can be inconsistent, with a wrong size.
     # So, recovery RRD usind dump+restore
     recovery($file);
     print "All DS deleted\n";
@@ -143,17 +159,104 @@ if ($command eq "print-rra") {
     exit 0;
 }    
 
-# Resize RRAs
-if ($command eq "resize-rra") {
-    # This must be done manually
+# Resize RRAs - Rows
+if ($command eq "resize-rows-rra") {
+    # This command changes only the row value and mantein the same step. Obviously, the period is also scaled.
+    # Example: If the number of rows is duplicated, the period is duplicated too.
+
+    # Error
+	print "Syntax error. You must pass one id and the new number of rows.\n" and usage() and
+            exit 1 if !$id or !$torows;
+
+    my $orig_rows = $rrd->RRA_numrows($id);
+
+    # Resize 
+    print "Resizing RRA $id from $orig_rows to $torows...\n";
+    $rrd->resize_RRA($id, $torows);
+    $rrd->save();
+    $rrd->close();
+    print "Number of rows changed\n";
+    # TODO - Test if it's needed to use recovery.
+    exit 0;
+}
+
+# Resize RRAs - Step
+if ($command eq "resize-step-rra") {
+    # This command changes the step and row values to mantein the same period.
+    # Example: If the step is divided by two, the number of rows is duplicated
+    #
     # According to RRD::Editor, "changing the step size is hard as it would require resampling the data stored in the RRA".
     # So, they "leave this 'to do'".
     # See: http://search.cpan.org/~dougleith/RRD-Editor/lib/RRD/Editor.pm#RRA_step
-
+    #
     # How can we implement this?
+    # 3 algothims: with-add, with-step or with-interpolation
     # See: RRA_STEP.md
 
-    print "BAD NEWS. We not implemented this feature yet. We're studying it now!\n";
+    # Error
+	print "Syntax error. You must pass one id and the new step.\n" and usage() and
+            exit 1 if !$id or !$tostep;
+    $with_add = 1 if !$with_add and !$with_step and !$with_interpolation;
+    print "Syntax error. You must select only one algorithm.\n" and usage() and
+            exit 1 if ($with_add and $with_step) or ($with_add and $with_interpolation) or 
+            ($with_step and $with_interpolation);
+    
+    # New RRA
+    # FIXME round new_rows when the number of rows is not integer
+    my $orig_step = $rrd->RRA_step($id);
+    my $orig_rows = $rrd->RRA_numrows($id);
+    my $orig_xff = $rrd->RRA_xff($id);
+    my $orig_type = $rrd->RRA_type($id);
+    my $minstep = $rrd->minstep();
+    my $step_relative = $tostep / $minstep;
+    my $new_rows = $orig_step * $orig_rows / $tostep;
+    my $newrra_string = "RRA:$orig_type:$orig_xff:$step_relative:$new_rows";
+
+    # Error
+    print "Invalid value error. The step must be a multiple of the minimum step: $minstep\n" and
+            exit 1 if $step_relative =~ /\D/;
+
+    # With add (--with-add)
+    # Add new RRAs, and a 'at' task to delete the old ones
+    if ($with_add) {
+         # Add RRA
+         print "Adding new RRA: [$newrra_string]...\n";
+         $rrd->add_RRA($newrra_string);
+         $rrd->save();
+         $rrd->close();
+         printf "New RRA added\n";
+         # Print 'at' command
+         my $time_hours =  $orig_step * $orig_rows / 3600;
+         print "Old RRA (id=$id) expires in $time_hours hours.\n";
+         print "Run this command to delete this RRA after it's no more necessary:\n"; 
+         my $script_name = $0;
+         $script_name =~ s{./}{};
+         printf "    echo \"%s\" | at now + %s hours\n", $ENV{PWD} . "/" . $script_name . " delete-rra --id " . $id, $time_hours;
+    }
+
+
+    # Algorithm 2 - With interpolation
+    #my $endtime = $rrd->last();
+    #my $orig_step = $rrd->RRA_step($id);
+    #my $orig_rows = $rrd->RRA_numrows($id);
+    #my $interval = $orig_step * $orig_rows;
+
+    # RRDs::fetch is much better than RRD::editor->fetch
+    # dsnames is a pointer to an array
+    # data is a pointer to an array of pointer to array
+    #my ($start,$step,$dsnames,$data) = RRDs::fetch($file, "AVERAGE", "-r", "$orig_step", "-s", "$endtime-$interval", "-e", "$endtime");
+    
+    #my @knots = '';
+    
+
+    # Create the knots for interpolator
+    #foreach $line (@$data) {
+    #    print "@$line\n";
+    #    foreach $i (0 .. scalar @$line - 1) {
+    #       print $i; 
+    #    }
+    #}
+
     exit 0;
 }
 

@@ -20,6 +20,7 @@ Perl Modules:
 
     cpan install ExtUtils::MakeMaker
     cpan install RRD::Editor
+    cpan install Math::Interpolator
 
 
 Quick start
