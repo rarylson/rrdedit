@@ -1,14 +1,14 @@
 rrdedit
 =======
 
-Command line tool that edit RRDs. It 
+Command line tool that edit RRDs.
 
 It uses the RRD::Editor and RRDs perl modules.
 
 Currently, there are only these funcionalities:
 
-- Print datasource informations
-- Print RRA informations
+- Print datasource information
+- Print RRA information
 - Remove datasources
 - Resize RRA time by changing the number of rows
 - Resize RRA precision by changing the RRA step
@@ -31,23 +31,23 @@ Perl Modules:
 Quick start
 -----------
 
-To print informations:
+To print information:
 
-    # print datasource informations
+    # print datasource information
     ./rrdedit.pl print-ds --file test/ping_rta.rrd
     
     # print more detailed
     ./rrdedit.pl print-ds --file test/ping_rta.rrd --full
     
-    # print rra informations
+    # print rra information
     ./rrdedit.pl print-rra --file test/ping_rta.rrd
 
-Edit datasources:
+To edit datasources:
 
     # Delete two datasources
     ./rrdedit.pl delete-ds --file test/ping_rta.rrd --names min,warn
 
-Edit RRA:
+To edit RRA:
 
     # Adding more rows
     ./rrdedit.pl resize-rows-rra --file test/ping_rta.rrd --id 3 --torows 900
@@ -68,7 +68,7 @@ To get help:
 TODO
 ----
 
-This plugin is very very simple. We want to implement:
+This plugin is very, very simple. We want to implement:
 
 - Short names in syntax, like:
 
@@ -78,5 +78,5 @@ This plugin is very very simple. We want to implement:
 
 - Two more algorithms for resize-step-rra (You'll choose the one you prefer!)
 
-- Others operations with datasource and RRA
+- Other operations with datasource and RRA
 
