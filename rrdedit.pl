@@ -11,6 +11,7 @@
 # TODO Consider change array lenght to "scalar @array"
 
 use Getopt::Long;
+use POSIX;
 use RRD::Editor;
 use RRDs;
 use Math::Interpolator::Robust;
@@ -80,9 +81,10 @@ my $tostep = '';
 my $with_add = '';
 my $with_step = '';
 my $with_interpolation = '';
+my $schedule = '';
 GetOptions ('file=s' => \$file, 'full' => \$full, 'name=s' => \$name, 'ignore' => \$ignore, 'old=s' => \$old, 'new=s' => \$new, 
         'id=s' => \$id, 'torows=i' => \$torows, 'tostep=i' => \$tostep, 'with-add' => \$with_add, 'with-step' => \$with_step, 
-        'with-interpolation' => \$with_interpolation);
+        'with-interpolation' => \$with_interpolation, 'schedule' => \$schedule);
 @names = split(/,/,$name);
 @ids = split(/,/,$id);
 
@@ -202,7 +204,6 @@ if ($command eq "resize-step-rra") {
             ($with_step and $with_interpolation);
     
     # New RRA
-    # FIXME round new_rows when the number of rows is not integer
     my $orig_step = $rrd->RRA_step($id);
     my $orig_rows = $rrd->RRA_numrows($id);
     my $orig_xff = $rrd->RRA_xff($id);
@@ -210,6 +211,8 @@ if ($command eq "resize-step-rra") {
     my $minstep = $rrd->minstep();
     my $step_relative = $tostep / $minstep;
     my $new_rows = $orig_step * $orig_rows / $tostep;
+    # Round new_rows when the result is not integer
+    $new_rows = ceil($new_rows);
     my $newrra_string = "RRA:$orig_type:$orig_xff:$step_relative:$new_rows";
 
     # Error
@@ -219,19 +222,36 @@ if ($command eq "resize-step-rra") {
     # With add (--with-add)
     # Add new RRAs, and a 'at' task to delete the old ones
     if ($with_add) {
-         # Add RRA
-         print "Adding new RRA: [$newrra_string]...\n";
-         $rrd->add_RRA($newrra_string);
-         $rrd->save();
-         $rrd->close();
-         printf "New RRA added\n";
-         # Print 'at' command
-         my $time_hours =  $orig_step * $orig_rows / 3600;
-         print "Old RRA (id=$id) expires in $time_hours hours.\n";
-         print "Run this command to delete this RRA after it's no more necessary:\n"; 
-         my $script_name = $0;
-         $script_name =~ s{./}{};
-         printf "    echo \"%s\" | at now + %s hours\n", $ENV{PWD} . "/" . $script_name . " delete-rra --id " . $id, $time_hours;
+        
+        # Add RRA
+        print "Adding new RRA: [$newrra_string]...\n";
+        $rrd->add_RRA($newrra_string);
+        $rrd->save();
+        $rrd->close();
+        printf "New RRA added\n";
+        # Time changed. New rows was ceilled
+        my $orig_time = $orig_step * $orig_rows;
+        my $new_time = $new_rows * $tostep;
+        printf "Total time changed: from $orig_time seconds to $new_time\n" if $orig_time ne $new_time;
+        
+        # Generate 'at' command
+        my $time_hours =  $orig_time / 3600;
+        print "Old RRA (id=$id) expires in $time_hours hours.\n";
+        my $script_name = $0;
+        $script_name =~ s{./}{};
+        my $at_string = sprintf "%s/%s delete-rra --file %s --id %s", $ENV{PWD}, $script_name, $file, $id;
+        my $script_string = "echo \"$at_string\" | at now + $time_hours hours";
+        
+        # Only print the command to schedule the delete operation
+        if (! $schedule) {
+            print "Run this command to delete this RRA after it's no more necessary:\n"; 
+            printf "    $script_string\n";
+        }
+        # Schedule delete operation
+        else {
+            print "Scheduling delete operation: $at_string\n";
+            `$script_string`;
+        }
     }
 
 
