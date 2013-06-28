@@ -1,12 +1,17 @@
 rrdedit
 =======
 
-Command line tool that edit RRDs. It's a wrapper to some funcionalities of the RRD::Editor perl module.
+Command line tool that edit RRDs. It 
+
+It uses the RRD::Editor and RRDs perl modules.
 
 Currently, there are only these funcionalities:
 
 - Print datasource informations
+- Print RRA informations
 - Remove datasources
+- Resize RRA time by changing the number of rows
+- Resize RRA precision by changing the RRA step
 
 
 Requirements
@@ -26,30 +31,52 @@ Perl Modules:
 Quick start
 -----------
 
-Print all Datasources:
+To print informations:
 
-    ./rrdedit.pl --file test/ping_rta.rrd --print
+    # print datasource informations
+    ./rrdedit.pl print-ds --file test/ping_rta.rrd
+    
+    # print more detailed
+    ./rrdedit.pl print-ds --file test/ping_rta.rrd --full
+    
+    # print rra informations
+    ./rrdedit.pl print-rra --file test/ping_rta.rrd
 
-Delete datasources:
+Edit datasources:
 
-    ./rrdedit.pl --file test/ping_rta.rrd --delete min,warn
+    # Delete two datasources
+    ./rrdedit.pl delete-ds --file test/ping_rta.rrd --names min,warn
 
-or
+Edit RRA:
 
-    ./rrdedit.pl --file test/ping_rta.rrd --delete min --delete warn
+    # Adding more rows
+    ./rrdedit.pl resize-rows-rra --file test/ping_rta.rrd --id 3 --torows 900
+    
+    # Increasing precision (changing step) using 'with-add' algorithm
+    ./rrdedit.pl resize-step-rra --file test/ping_rta.rrd --id 2 --tostep 7800 --with-add
+
 
 To get help:
 
+    # Usage
+    ./rrdedit.pl --usage
+
+    # Help (not yet implemented)
     ./rrdedit.pl --help
 
 
 TODO
 ----
 
-This plugin is very very simple. We want:
+This plugin is very very simple. We want to implement:
 
-- Syntax like ./rrdedit.pl deleteds --file file.rrd --dsname name1,name2 (it is, ./rrdedit.pl command --param1 value1 --param2 --param3 value3)
-- Short names in syntax, like ./rrdedit.pl deleteds -f file.rrd -n name1,name2
-- Better print report
-- Add/delete datasources, and add/delete rra
+- Short names in syntax, like:
+
+  ```./rrdedit.pl delete-ds -f file.rrd -n name1,name2```
+
+- A useful help and a usage for every command
+
+- Two more algorithms for resize-step-rra (You'll choose the one you prefer!)
+
+- Others operations with datasource and RRA
 
