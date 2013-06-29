@@ -7,15 +7,16 @@
 #      http://www.cs.mcgill.ca/~abatko/computers/programming/perl/howto/getopts/
 #      http://search.cpan.org/~dougleith/RRD-Editor/lib/RRD/Editor.pm
 #      http://oss.oetiker.ch/rrdtool/prog/RRDs.en.html
-#
-# TODO Consider change array lenght to "scalar @array"
 
 use Getopt::Long;
 use POSIX;
 use RRD::Editor;
+use RRD::Tweak;
 use RRDs;
 use Math::Interpolator::Robust;
 use Math::Interpolator::Knot;
+
+use Data::Printer;
 
 # Usage
 sub usage {
@@ -36,7 +37,8 @@ sub help {
 # the header.
 # In these cases, dump and restore the RRD recovery the RRD database. 
 sub recovery {
-    local($file) = $_[0];
+    my $file = $_[0];
+    
     # XML file for recovery purpose
     my $file_xml = $file;
     $file_xml =~ s/\.rrd/\.xml/;
@@ -46,8 +48,69 @@ sub recovery {
     unlink($file_xml);
 }
 
+# Get total time of a RRA
+sub totaltime_rra {
+    my ($file, $id) = @_;
+    my $rrd = RRD::Editor->new();
+
+    $rrd->open($file);
+    my $totaltime = $rrd->RRA_step($id) * $rrd->RRA_numrows($id);
+    $rrd->close(); 
+
+    return $totaltime;
+}
+
+# Change RRA from a RRD
+# Create a new RRD with a RRA cheged by a new RRA
+sub change_rra {
+    my ($file, $new_file, $old_id, $new_step, $new_rows, $new_rra_string) = @_;
+    
+    my $rrd_editor = RRD::Editor->new();
+    $rrd_editor->open($file);
+    my $rrd_tweak = RRD::Tweak->new();
+    $rrd_tweak->load_file($file);
+
+    # Get definition string for all datasources
+    $rrd_editor->open($file);
+    my $ds_num = scalar $rrd_editor->DS_names();
+    my @ds_string;
+    for $i (0 .. $ds_num - 1) {
+        push @ds_string, $rrd_tweak->ds_descr($i);
+    }
+
+    # Get definition string for all RRAs
+    my $rra_num = $rrd_editor->num_RRAs();
+    my @rra_string;
+    for $i (0 .. $rra_num - 1) {
+        # Not get definition of the old RRA
+        if ($i ne $old_id) {
+            push @rra_string, [$i, $rrd_editor->RRA_step($i), $rrd_editor->RRA_numrows($i), $rrd_tweak->rra_descr($i)];
+        }
+    }
+    # Push definition of the new RRA
+    push @rra_string, [$rra_num, $new_step, $new_rows, $new_rra_string];
+    # Sort RRA by precision (step)
+    @rra_string = sort {$a->[1] <=> $b->[1]} @rra_string;
+
+    # Calculate new RRD string
+    # To undestand what is a map
+    # See: http://www.misc-perl-info.com/join-aoa.html
+    my $minstep = $rrd_editor->minstep();
+    # Start is calculated by: endtime - max(rra_step * rra_rows); 
+    my $max_totaltime = (sort {$b <=> $a} map ($_->[1] * $_->[2], @rra_string) )[0];
+    my $start_time = $rrd_editor->last() - $max_totaltime;
+    my $rrd_new_string = sprintf "--start %s --step %s %s %s", $start_time, $minstep, join(" ", @ds_string), 
+            join(" ", map ($_->[3], @rra_string));
+
+    # Create new RRD
+    my $rrd_editor_new = RRD::Editor->new();
+    $rrd_editor_new->create($rrd_new_string);
+    $rrd_editor_new->save( "$file.new" );
+    $rrd_editor_new->close();
+}
+
 # At least one argument
-if ($#ARGV eq -1) {
+if (scalar(@ARGV) eq 0) {
     usage();
 	exit 1;
 } 
@@ -178,7 +241,6 @@ if ($command eq "resize-rows-rra") {
     $rrd->save();
     $rrd->close();
     print "Number of rows changed\n";
-    # TODO - Test if it's needed to use recovery.
     exit 0;
 }
 
@@ -223,7 +285,7 @@ if ($command eq "resize-step-rra") {
     # Add new RRAs, and a 'at' task to delete the old ones
     if ($with_add) {
         
-        # Add RRA
+        # Adding new RRA
         print "Adding new RRA: [$newrra_string]...\n";
         $rrd->add_RRA($newrra_string);
         $rrd->save();
@@ -234,7 +296,9 @@ if ($command eq "resize-step-rra") {
         my $new_time = $new_rows * $tostep;
         printf "Total time changed: from $orig_time seconds to $new_time\n" if $orig_time ne $new_time;
         
-        # Generate 'at' command
+        # Generate 'at' command to schedule the delete operation
+        # 'at' is a linux tool that permits executing commands at a specified time.
+        # See: http://linux.die.net/man/1/at
         my $time_hours =  $orig_time / 3600;
         print "Old RRA (id=$id) expires in $time_hours hours.\n";
         my $script_name = $0;
@@ -242,42 +306,64 @@ if ($command eq "resize-step-rra") {
         my $at_string = sprintf "%s/%s delete-rra --file %s --id %s", $ENV{PWD}, $script_name, $file, $id;
         my $script_string = "echo \"$at_string\" | at now + $time_hours hours";
         
-        # Only print the command to schedule the delete operation
+        # Only print the 'at' command
         if (! $schedule) {
             print "Run this command to delete this RRA after it's no more necessary:\n"; 
             printf "    $script_string\n";
         }
-        # Schedule delete operation
+        # Schedule the delete operation (--schedule)
         else {
             print "Scheduling delete operation: $at_string\n";
             `$script_string`;
         }
+
+        $rrd->save();
+        $rrd->close();
+        exit 0;
     }
 
+    # With step (--with-step)
+    # Insert new points using the step function
+    if ($with_step) {
+        
+        # We need to create a new RRD with the new RRA and insert the new points in it, because 
+        # "you MUST always feed values in chronological order. Stuff breaks if you don't, so don't.".
+        # See: http://ds9a.nl/rrd-mini-howto/cvs/rrd-mini-howto/output/rrd-mini-howto-1.html#ss1.3
+        #      https://lists.oetiker.ch/pipermail/rrd-users/2012-June/018661.html 
+        
+        # Create the new RRA
+        print "Creating new RRD structure\n";
+        my $new_file = $file;
+        $new_file =~ s/\.rrd/_new.rrd/; 
+        change_rra($file, $new_file, $id, $tostep, $new_rows, $newrra_string);
+        print "New RRD structure created\n";
 
-    # Algorithm 2 - With interpolation
-    #my $endtime = $rrd->last();
-    #my $orig_step = $rrd->RRA_step($id);
-    #my $orig_rows = $rrd->RRA_numrows($id);
-    #my $interval = $orig_step * $orig_rows;
+        # Getting the points
+        print "Points not migrated... We doesn't yet implement this!\n";
+        
+        #$my $endtime = $rrd->last();
+        #$my $num_rras = $rrd->num_RRAs();
+        # Foreach RRA, fetch data
+        # Note: RRDs::fetch is better than RRD::editor->fetch
+        #       $dsnames is a pointer to an array; $data is a pointer to an array that all elements also
+        #       are a ponter to an array
+        # See: http://oss.oetiker.ch/rrdtool/prog/RRDs.en.html
+        #$foreach $id_iter (0 .. $num_rra-1) {
+        #    print "I'm here";
+        #}
+        #my ($start,$step,$dsnames,$data) = RRDs::fetch($file, "AVERAGE", "-r", "$orig_step", "-s", "$endtime-$orig_time", "-e", "$endtime");
 
-    # RRDs::fetch is much better than RRD::editor->fetch
-    # dsnames is a pointer to an array
-    # data is a pointer to an array of pointer to array
-    #my ($start,$step,$dsnames,$data) = RRDs::fetch($file, "AVERAGE", "-r", "$orig_step", "-s", "$endtime-$interval", "-e", "$endtime");
+        
+        #$rrd->save();
+        #$rrd->close(); 
+        #exit 0;
+        
+        # How to make a hash
+        #my %hash=();
+        #$hash{"element1"}=1;
+        
+    }
     
-    #my @knots = '';
-    
-
-    # Create the knots for interpolator
-    #foreach $line (@$data) {
-    #    print "@$line\n";
-    #    foreach $i (0 .. scalar @$line - 1) {
-    #       print $i; 
-    #    }
-    #}
-
-    exit 0;
 }
 
 # Command not implemented yet
