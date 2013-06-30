@@ -275,6 +275,8 @@ if ($command eq "resize-step-rra") {
     my $new_rows = $orig_step * $orig_rows / $tostep;
     # Round new_rows when the result is not integer
     $new_rows = ceil($new_rows);
+    my $orig_time = $orig_step * $orig_rows;
+    my $new_time = $new_rows * $tostep;
     my $newrra_string = "RRA:$orig_type:$orig_xff:$step_relative:$new_rows";
 
     # Error
@@ -292,8 +294,6 @@ if ($command eq "resize-step-rra") {
         $rrd->close();
         printf "New RRA added\n";
         # Time changed. New rows was ceilled
-        my $orig_time = $orig_step * $orig_rows;
-        my $new_time = $new_rows * $tostep;
         printf "Total time changed: from $orig_time seconds to $new_time\n" if $orig_time ne $new_time;
         
         # Generate 'at' command to schedule the delete operation
@@ -322,9 +322,8 @@ if ($command eq "resize-step-rra") {
         exit 0;
     }
 
-    # With step (--with-step)
-    # Insert new points using the step function
-    if ($with_step) {
+    # Other algorithms
+    if ($with_step or $with_interpolation) {
         
         # We need to create a new RRD with the new RRA and insert the new points in it, because 
         # "you MUST always feed values in chronological order. Stuff breaks if you don't, so don't.".
@@ -337,30 +336,54 @@ if ($command eq "resize-step-rra") {
         $new_file =~ s/\.rrd/_new.rrd/; 
         change_rra($file, $new_file, $id, $tostep, $new_rows, $newrra_string);
         print "New RRD structure created\n";
+        # Time changed. New rows was ceilled
+        printf "RRA time changed: from $orig_time seconds to $new_time\n" if $orig_time ne $new_time;
 
-        # Getting the points
-        print "Points not migrated... We doesn't yet implement this!\n";
+        # Create RRA array and sort by precision (step)
+        my @rra_sort;
+        my $num_rra = $rrd->num_RRAs();
+        my $end_time = $rrd->last();
         
-        #$my $endtime = $rrd->last();
-        #$my $num_rras = $rrd->num_RRAs();
+        for $i (0 .. $num_rra - 1) {
+            push @rra_sort, [$i, $rrd->RRA_step($i), $rrd->RRA_numrows($i)];
+        }
+        @rra_sort = sort {$a->[1] <=> $b->[1]} @rra_sort;
+
         # Foreach RRA, fetch data
-        # Note: RRDs::fetch is better than RRD::editor->fetch
-        #       $dsnames is a pointer to an array; $data is a pointer to an array that all elements also
-        #       are a ponter to an array
-        # See: http://oss.oetiker.ch/rrdtool/prog/RRDs.en.html
-        #$foreach $id_iter (0 .. $num_rra-1) {
-        #    print "I'm here";
-        #}
-        #my ($start,$step,$dsnames,$data) = RRDs::fetch($file, "AVERAGE", "-r", "$orig_step", "-s", "$endtime-$orig_time", "-e", "$endtime");
+        my %data_hash = ();
+        my @dsnames = $rrd->DS_names();
+        for $i (0 .. $num_rra - 1) {
+            my $iter_id = $rra_sort[$i]->[0];
+            my $iter_step = $rra_sort[$i]->[1];
+            my $iter_rows = $rra_sort[$i]->[2];
+            my $iter_time = $iter_step * $iter_rows;
+            my $start_time = $end_time-$iter_time;
+
+            # RRDs::fetch is better than RRD::editor->fetch
+            # Notes: $dsnames is a pointer to an array; $data is a pointer to an array that all elements also
+            #        are a ponter to an array
+            # See: http://oss.oetiker.ch/rrdtool/prog/RRDs.en.html
+            my ($iter_start, $real_step, undef, $data) = RRDs::fetch($file, "AVERAGE", "-r", $iter_step, "-s", $start_time, 
+                    "-e", $end_time-$iter_step);
+
+            # Insert points into the data hash
+            # Because the fetchs used RRAs in a sorted way, data hash always is setted with the most precise value
+            # To understant what is a hash
+            # See: http://www.cs.mcgill.ca/~abatko/computers/programming/perl/howto/hash/
+            my $insert_time = $iter_start; 
+            foreach $data_line (@$data) {
+                $data_hash{$insert_time} = $data_line;
+                $insert_time += $iter_step; 
+            }
+        }
+
+        # With step (--with-step)
+        # Insert new points using the step function
 
         
-        #$rrd->save();
-        #$rrd->close(); 
-        #exit 0;
-        
-        # How to make a hash
-        #my %hash=();
-        #$hash{"element1"}=1;
+        $rrd->save();
+        $rrd->close(); 
+        exit 0;
         
     }
     
