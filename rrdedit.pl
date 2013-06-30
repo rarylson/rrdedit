@@ -350,6 +350,7 @@ if ($command eq "resize-step-rra") {
         @rra_sort = sort {$a->[1] <=> $b->[1]} @rra_sort;
 
         # Foreach RRA, fetch data
+        print "Generating points\n";
         my %data_hash = ();
         my @dsnames = $rrd->DS_names();
         for $i (0 .. $num_rra - 1) {
@@ -376,15 +377,42 @@ if ($command eq "resize-step-rra") {
                 $insert_time += $iter_step; 
             }
         }
+        print "Points generated\n";
 
-        # With step (--with-step)
-        # Insert new points using the step function
+        # Interpolation is only needed when new step is smaller then orig step. That is, the new rra is more precise
+        if ($tostep > $orig_step) {
+            # With step (--with-step)
+            # Insert new points using the step function
+            if ($with_step) {
+                 
+            }
+            # With interpolation (--with-interpolation)
+            # Insert new points using a smooth interpolation
+            elsif ($with_interpolation) {
+                print "Not yet implemented :(\n" and exit 1;
+            }
+        }
 
-        
-        $rrd->save();
-        $rrd->close(); 
+        # Save data in the new RRD
+        $rrd_new = RRD::Editor->new();
+        $rrd_new->open($new_file);
+        my $update_string = '';
+        foreach $timestamp (keys %data_hash) {
+            my $temp_data = %data_hash{$timestamp};
+            p $temp_data;
+            @iter_data = @$temp_data;
+            # TODO We need to map undefined values to 'U'
+            $update_string = sprintf "%d:%s", $timestamp, join(":", @iter_data);
+            # $rrd_new->update($update_string);
+            p $update_string;
+            exit;
+        }
+            
+        $rrd_new->save();
+        $rrd_new->close();
+        $rrd->close();
+        # TODO Overwrite the old RRD
         exit 0;
-        
     }
     
 }
