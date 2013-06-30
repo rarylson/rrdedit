@@ -89,5 +89,5 @@ Do this:
 
 The follow picture summarizes these three algorithms:
 
-![](interpolation.png?raw=true)
+![Interpolation types](interpolation.png "Interpolation types")
 
