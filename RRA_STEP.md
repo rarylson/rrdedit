@@ -37,7 +37,7 @@ Again, it works and the resolution is half of the initial value:
 It's possible generate less points, but never more points. So, if we want insert point into a more precise RRA, we need to generate more points.
 
 
-### Interpolation
+### Interpolation in Perl
 
 See:
 
@@ -68,8 +68,8 @@ Do this:
 
 Do this:
 
-- Fetch data using the old RRA;
 - Add the new RRA;
+- Fetch data using the old RRA;
 - Save all the points in the new RRA. When a point is new, this value will be the same of the previous real point.
 - Delete the old RRA
 
@@ -80,10 +80,14 @@ Do this:
 
 Do this:
 
-- Fetch data using the old RRA;
 - Add the new RRA;
+- Fetch data using the old RRA;
 - Foreach DS, generate points for the interpolation algorithm;
 - Generate new points using the interpolation method;
 - Save all the points in the new RRA;
 - Delete the old RRA
+
+The follow picture summarizes these three algorithms:
+
+![](interpolation.png?raw=true)
 
