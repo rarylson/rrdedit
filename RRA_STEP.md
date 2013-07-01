@@ -89,5 +89,6 @@ Do this:
 
 The follow picture summarizes these three algorithms:
 
-![Interpolation types](interpolation.png "Interpolation types")
+![](interpolation.png)
+![](/infra/rrdedit/raw/master/interpolation.png)
 
