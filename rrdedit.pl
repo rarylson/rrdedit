@@ -48,20 +48,8 @@ sub recovery {
     unlink($file_xml);
 }
 
-# Get total time of a RRA
-sub totaltime_rra {
-    my ($file, $id) = @_;
-    my $rrd = RRD::Editor->new();
-
-    $rrd->open($file);
-    my $totaltime = $rrd->RRA_step($id) * $rrd->RRA_numrows($id);
-    $rrd->close(); 
-
-    return $totaltime;
-}
-
 # Change RRA from a RRD
-# Create a new RRD with a RRA cheged by a new RRA
+# Create a new RRD with a RRA changed by a new RRA
 sub change_rra {
     my ($file, $new_file, $old_id, $new_step, $new_rows, $new_rra_string) = @_;
     
@@ -105,8 +93,11 @@ sub change_rra {
     # Create new RRD
     my $rrd_editor_new = RRD::Editor->new();
     $rrd_editor_new->create($rrd_new_string);
-    $rrd_editor_new->save( "$file.new" );
+    $rrd_editor_new->save($new_file);
     $rrd_editor_new->close();
+
+    # Recovery new RRD
+    recovery($new_file);
 }
 
 # At least one argument
@@ -317,8 +308,6 @@ if ($command eq "resize-step-rra") {
             `$script_string`;
         }
 
-        $rrd->save();
-        $rrd->close();
         exit 0;
     }
 
@@ -332,8 +321,8 @@ if ($command eq "resize-step-rra") {
         
         # Create the new RRA
         print "Creating new RRD structure\n";
-        my $new_file = $file;
-        $new_file =~ s/\.rrd/_new.rrd/; 
+        $rrd->close();
+        my $new_file = "$file.new";
         change_rra($file, $new_file, $id, $tostep, $new_rows, $newrra_string);
         print "New RRD structure created\n";
         # Time changed. New rows was ceilled
@@ -380,11 +369,11 @@ if ($command eq "resize-step-rra") {
         print "Points generated\n";
 
         # Interpolation is only needed when new step is smaller then orig step. That is, the new rra is more precise
-        if ($tostep > $orig_step) {
+        if ($tostep lt $orig_step) {
             # With step (--with-step)
             # Insert new points using the step function
             if ($with_step) {
-                 
+                print "Not yet implemented :(\n" and exit 1;
             }
             # With interpolation (--with-interpolation)
             # Insert new points using a smooth interpolation
@@ -397,21 +386,23 @@ if ($command eq "resize-step-rra") {
         $rrd_new = RRD::Editor->new();
         $rrd_new->open($new_file);
         my $update_string = '';
-        foreach $timestamp (keys %data_hash) {
-            my $temp_data = %data_hash{$timestamp};
-            p $temp_data;
+        foreach $timestamp (sort keys %data_hash) {
+            my $temp_data = $data_hash{$timestamp};
             @iter_data = @$temp_data;
-            # TODO We need to map undefined values to 'U'
+            # Change undefined values to 'U'
+            foreach $value (@iter_data) {
+                $value = "U" if ! defined $value;
+            }
             $update_string = sprintf "%d:%s", $timestamp, join(":", @iter_data);
-            # $rrd_new->update($update_string);
-            p $update_string;
-            exit;
+            # RRD:Editor->update flushs to disk and closes the file descriptor.
+            # It's a bug and we're using the workarround sugested by the RRD::Editor project owner. 
+            # However, there is no cache, and it's slow (low performance).
+            # See: https://rt.cpan.org/Public/Bug/Display.html?id=86596
+            $rrd_new->update($update_string);
         }
-            
-        $rrd_new->save();
+        # Not running RRD::Editor->save because of the previous described bug.
+        #$rrd_new->save();
         $rrd_new->close();
-        $rrd->close();
-        # TODO Overwrite the old RRD
         exit 0;
     }
     
