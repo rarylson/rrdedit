@@ -67,6 +67,14 @@ To get help:
 
 And more...
 
+
+License
+-------
+
+This software is protected by Revised BSD License.
+See: [rrdedit.pl License](LICENSE)
+
+
 TODO
 ----
 
