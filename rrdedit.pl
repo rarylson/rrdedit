@@ -17,6 +17,10 @@ use Math::Interpolator::Robust;
 use Math::Interpolator::Knot;
 
 use Data::Printer;
+use Time::HiRes;
+
+# DEBUG
+my $start_run = Time::HiRes::time();
 
 # Usage
 sub usage {
@@ -368,6 +372,11 @@ if ($command eq "resize-step-rra") {
         }
         print "Points generated\n";
 
+        # DEBUG
+        my $run_time = Time::HiRes::time() - $start_run;;
+        print "DEBUG: From start to this moment: $run_time\n";
+        $start_run = Time::HiRes::time();
+
         # Interpolation is only needed when new step is smaller then orig step. That is, the new rra is more precise
         if ($tostep lt $orig_step) {
             # With step (--with-step)
@@ -383,6 +392,7 @@ if ($command eq "resize-step-rra") {
         }
 
         # Save data in the new RRD
+        print "Inserting new points\n";
         $rrd_new = RRD::Editor->new();
         $rrd_new->open($new_file);
         my $update_string = '';
@@ -403,6 +413,15 @@ if ($command eq "resize-step-rra") {
         # Not running RRD::Editor->save because of the previous described bug.
         #$rrd_new->save();
         $rrd_new->close();
+        print "Points inserted\n";
+        
+        # DEBUG
+        $run_time = Time::HiRes::time() - $start_run;;
+        print "DEBUG: From 'insert points' to this moment: $run_time\n";
+        
+        # Overwrite the original RRD with the new RRD
+        rename($new_file, $file);
+        print "RRD migrated. RRA step changed from $orig_step to $tostep\n";
         exit 0;
     }
     
