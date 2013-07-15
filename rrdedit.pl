@@ -8,6 +8,9 @@
 #      http://search.cpan.org/~dougleith/RRD-Editor/lib/RRD/Editor.pm
 #      http://oss.oetiker.ch/rrdtool/prog/RRDs.en.html
 
+use strict;
+use warnings;
+
 use Getopt::Long;
 use POSIX;
 use RRD::Editor;
@@ -70,14 +73,14 @@ sub change_rra {
     $rrd_editor->open($file);
     my $ds_num = scalar $rrd_editor->DS_names();
     my @ds_string;
-    for $i (0 .. $ds_num - 1) {
+    for my $i (0 .. $ds_num - 1) {
         push @ds_string, $rrd_tweak->ds_descr($i);
     }
 
     # Get definition string for all RRAs
     my $rra_num = $rrd_editor->num_RRAs();
     my @rra_string;
-    for $i (0 .. $rra_num - 1) {
+    for my $i (0 .. $rra_num - 1) {
         # Not get definition of the old RRA
         if ($i ne $old_id) {
             push @rra_string, [$i, $rrd_editor->RRA_step($i), $rrd_editor->RRA_numrows($i), $rrd_tweak->rra_descr($i)];
@@ -150,7 +153,7 @@ help() and exit 0 if $help;
 usage() and exit 0 if $usage;
 
 # Parse
-@validcommands = ("add-ds", "delete-ds", "rename-ds", "print-ds", "add-rra", "delete-rra", "resize-rows-rra", 
+my @validcommands = ("add-ds", "delete-ds", "rename-ds", "print-ds", "add-rra", "delete-rra", "resize-rows-rra", 
         "resize-step-rra", "print-rra");
 my $command = $ARGV[0];
 print "Invalid command name.\n" and usage() and exit 1 if ! grep $_ eq $command, @validcommands;
@@ -175,8 +178,8 @@ my $schedule = '';
 GetOptions ('file=s' => \$file, 'full' => \$full, 'name=s' => \$name, 'ignore' => \$ignore, 'old=s' => \$old, 'new=s' => \$new, 
         'id=s' => \$id, 'torows=i' => \$torows, 'tostep=i' => \$tostep, 'with-add' => \$with_add, 'with-step' => \$with_step, 
         'with-interpolation' => \$with_interpolation, 'schedule' => \$schedule);
-@names = split(/,/,$name);
-@ids = split(/,/,$id);
+my @names = split(/,/,$name);
+my @ids = split(/,/,$id);
 
 
 # Error
@@ -195,7 +198,7 @@ if ($command eq "print-ds") {
     # Print full
     if ($full) {
         my @infos = split /\n/, $rrd->info();
-        foreach $info (@infos) {
+        foreach my $info (@infos) {
             print "$info\n" if $info =~ /^ds/;
         }
     }
@@ -209,8 +212,8 @@ if ($command eq "delete-ds") {
 	print "Syntax error. You must pass one or more data source names to be deleted.\n" and usage() and
             exit 1 if !@names;
     # Deleting
-    print "Deleting: @names...\n";
-    foreach $dsname (@names) {
+    printf "Deleting: %s...\n", @names;
+    foreach my $dsname (@names) {
         # If ignore was setted, not die if a dsname does not exist.
         # See: http://affy.blogspot.com.br/p5be/ch13.htm
         eval{$rrd->delete_DS($dsname);};
@@ -235,7 +238,7 @@ if ($command eq "print-rra") {
     # RRAs doesn't have names. They're indexed from 0 to num_RRAs()-1.
     # Print number of rows foreach RRA
     # See: http://search.cpan.org/~dougleith/RRD-Editor/lib/RRD/Editor.pm#num_RRAs
-    foreach $i (0 .. $num_rra-1) {
+    foreach my $i (0 .. $num_rra-1) {
         printf "RRA %s:\n\tStep: %s\n\tRows: %s\n", $i, $rrd->RRA_step($i), $rrd->RRA_numrows($i);
         my $totaltime = $rrd->RRA_step($i) * $rrd->RRA_numrows($i);
         printf "\tTotal time: %d seconds (%d hours)\n", $totaltime, $totaltime / 3600;
@@ -243,7 +246,7 @@ if ($command eq "print-rra") {
     # Print full
     if ($full) {
         my @infos = split /\n/, $rrd->info();
-        foreach $info (@infos) {
+        foreach my $info (@infos) {
             print "$info\n" if $info =~ /^rra/;
         }
     }
@@ -370,7 +373,7 @@ if ($command eq "resize-step-rra") {
         my $num_rra = $rrd->num_RRAs();
         my $end_time = $rrd->last();
         
-        for $i (0 .. $num_rra - 1) {
+        for my $i (0 .. $num_rra - 1) {
             push @rra_sort, [$i, $rrd->RRA_step($i), $rrd->RRA_numrows($i)];
         }
         @rra_sort = sort {$a->[1] <=> $b->[1]} @rra_sort;
@@ -379,7 +382,7 @@ if ($command eq "resize-step-rra") {
         print "Generating points\n" if $ENV{"DEBUG"};
         my %data_hash = ();
         my @dsnames = $rrd->DS_names();
-        for $i (0 .. $num_rra - 1) {
+        for my $i (0 .. $num_rra - 1) {
             my $iter_id = $rra_sort[$i]->[0];
             my $iter_step = $rra_sort[$i]->[1];
             my $iter_rows = $rra_sort[$i]->[2];
@@ -398,7 +401,7 @@ if ($command eq "resize-step-rra") {
             # To understant what is a hash
             # See: http://www.cs.mcgill.ca/~abatko/computers/programming/perl/howto/hash/
             my $insert_time = $iter_start; 
-            foreach $data_line (@$data) {
+            foreach my $data_line (@$data) {
                 $data_hash{$insert_time} = $data_line;
                 $insert_time += $iter_step; 
             }
@@ -426,14 +429,14 @@ if ($command eq "resize-step-rra") {
 
         # Save data in the new RRD
         print "Inserting new points\n" if $ENV{"DEBUG"};
-        $rrd_new = RRD::Editor->new();
+        my $rrd_new = RRD::Editor->new();
         $rrd_new->open($new_file);
         my $update_string = '';
-        foreach $timestamp (sort keys %data_hash) {
+        foreach my $timestamp (sort keys %data_hash) {
             my $temp_data = $data_hash{$timestamp};
-            @iter_data = @$temp_data;
+            my @iter_data = @$temp_data;
             # Change undefined values to 'U'
-            foreach $value (@iter_data) {
+            foreach my $value (@iter_data) {
                 $value = "U" if ! defined $value;
             }
             $update_string = sprintf "%d:%s", $timestamp, join(":", @iter_data);
@@ -441,6 +444,8 @@ if ($command eq "resize-step-rra") {
             # There is no cache and it's slow.
             # See: https://rt.cpan.org/Public/Bug/Display.html?id=86596
             # Call update using a cache
+            # TODO Para usar o cache com o RRDs::Update, temos que contatenar as strings em um array
+            # http://www.cs.cf.ac.uk/Dave/PERL/node61.html
             update_cache_rrd($rrd_new, $update_string);
             #$rrd_new->update($update_string);
         }
