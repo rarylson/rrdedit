@@ -8,12 +8,15 @@
 #      http://search.cpan.org/~dougleith/RRD-Editor/lib/RRD/Editor.pm
 #      http://oss.oetiker.ch/rrdtool/prog/RRDs.en.html
 
+# TODO Add 'convert': Convert between file formats (native-double, portable-double, portable-single)
+
 use 5.10.0;
 use strict;
 use warnings;
 
 use Getopt::Long;
 use POSIX;
+use Scalar::Util::Numeric;
 use RRD::Editor;
 use RRD::Tweak;
 use RRDs;
@@ -282,7 +285,7 @@ my @validcommands = ("add-ds", "delete-ds", "rename-ds", "print-ds", "add-rra", 
 my $command = $ARGV[0];
 
 # No command
-if (! grep $_ eq $command, @validcommands) {
+if (not grep $_ eq $command, @validcommands) {
     # Generic options (help and usage)
     my $help = '';
     my $usage = '';
@@ -323,7 +326,7 @@ help($command) and exit 0 if $help;
 
 # Error
 print "Syntax error. You must pass one file as argument.\n" and usage() and
-        exit 1 if !$file;
+        exit 1 if not $file;
 
 # Open RRD
 my $rrd = RRD::Editor->new();
@@ -349,14 +352,14 @@ if ($command eq "print-ds") {
 if ($command eq "delete-ds") {
     # Error
 	print "Syntax error. You must pass one or more data source names to be deleted.\n" and usage() and
-            exit 1 if !@names;
+            exit 1 if not @names;
     # Deleting
     printf "Deleting: %s...\n", @names;
     foreach my $dsname (@names) {
         # If ignore was setted, not die if a dsname does not exist.
         # See: http://affy.blogspot.com.br/p5be/ch13.htm
         eval{$rrd->delete_DS($dsname);};
-        die "DS '$dsname' does not exists\n" if $@ and !$ignore;
+        die "DS '$dsname' does not exists\n" if $@ and not $ignore;
     }
     $rrd->save();
     $rrd->close();
@@ -400,7 +403,7 @@ if ($command eq "resize-rows-rra") {
 
     # Error
 	print "Syntax error. You must pass one id and the new number of rows.\n" and usage() and
-            exit 1 if !$id or !$torows;
+            exit 1 if not $id or not $torows;
 
     my $orig_rows = $rrd->RRA_numrows($id);
 
@@ -427,8 +430,8 @@ if ($command eq "resize-step-rra") {
 
     # Error
 	print "Syntax error. You must pass one id and the new step.\n" and usage() and
-            exit 1 if !$id or !$tostep;
-    $with_add = 1 if !$with_add and !$with_step and !$with_interpolation;
+            exit 1 if not $id or not $tostep;
+    $with_add = 1 if not $with_add and not $with_step and not $with_interpolation;
     print "Syntax error. You must select only one algorithm.\n" and usage() and
             exit 1 if ($with_add and $with_step) or ($with_add and $with_interpolation) or 
             ($with_step and $with_interpolation);
@@ -449,7 +452,7 @@ if ($command eq "resize-step-rra") {
 
     # Error
     print "Invalid value error. The step must be a multiple of the minimum step: $minstep\n" and
-            exit 1 if $step_relative =~ /\D/;
+            exit 1 if not Scalar::Util::Numeric::isint($step_relative);
 
     # With add (--with-add)
     # Add new RRAs, and a 'at' task to delete the old ones
@@ -475,7 +478,7 @@ if ($command eq "resize-step-rra") {
         my $script_string = "echo \"$at_string\" | at now + $time_hours hours";
         
         # Only print the 'at' command
-        if (! $schedule) {
+        if (not $schedule) {
             print "Run this command to delete this RRA after it's no more necessary:\n"; 
             printf "    $script_string\n";
         }
@@ -573,7 +576,7 @@ if ($command eq "resize-step-rra") {
             my @iter_data = @$temp_data;
             # Change undefined values to 'U'
             foreach my $value (@iter_data) {
-                $value = "U" if ! defined $value;
+                $value = "U" if not defined $value;
             }
             $update_string = sprintf "%d:%s", $timestamp, join(":", @iter_data);
             update_cache_rrd($new_file, $update_string);
