@@ -9,6 +9,9 @@
 #      http://oss.oetiker.ch/rrdtool/prog/RRDs.en.html
 
 # TODO Add 'convert': Convert between file formats (native-double, portable-double, portable-single)
+# TODO Help for every command
+# TODO Usage for every command
+
 
 use 5.10.0;
 use strict;
@@ -39,32 +42,87 @@ our $AUTHOR_EMAIL = 'rarylson@vialink.com.br';
 # DEBUG TIME
 my $start_run = Time::HiRes::time();
 
-# TODO like help, usage for every command
-
 # Usage
 sub usage {
-	print "Usage: $0 <subcommand> ...\n";
-	print "       where: <subcommand> = add-ds|delete-ds|rename-ds|print-ds|\n" . 
-          "                             add-rra|delete-rra|resize-rows-rra|resize-step-rra|print-rra\n";
-	print "       Use: $0 --help for help\n";
+    my $usage_command = '';
+    my $from_help = 0;
+    my $usage_string = '';
+
+    # Usage for a specific command?
+    $usage_command = $_[0] if scalar(@_) ge 1;
+    # Usage called from help
+    $from_help = $_[1] if scalar(@_) eq 2;
+
+    # To undestand the "EOF"
+    # See: http://perlmaven.com/here-documents
+
+    # Generic usage
+    if ($usage_command eq '') {
+        ($usage_string = <<"        EOF") =~ s/^ {12}//gm;
+            Usage: $0 <subcommand> ...
+                   where: <subcommand> = add-ds|delete-ds|rename-ds|print-ds|add-rra|
+                                         delete-rra|resize-rows-rra|resize-step-rra|print-rra
+        EOF
+    }
+    # 'print-ds' usage
+    elsif ($usage_command eq 'print-ds') {
+        $usage_string = "Usage: $0 print-ds --file <filename> [--full]\n";
+    }
+    # 'add-ds' usage
+    elsif ($usage_command eq 'add-ds') {
+        $usage_string = "Usage: $0 add-ds --file <filename> --string <dsstring>\n";
+    }
+    # 'delete-ds' usage
+    elsif ($usage_command eq 'delete-ds') {
+        $usage_string = "Usage: $0 delete-ds --file <filename> --name <name1>[,<name2>,...] [--ignore]\n";
+    }
+    # 'rename-ds' usage
+    elsif ($usage_command eq 'rename-ds') {
+        $usage_string = "Usage: $0 rename-ds --file <filename> --old <oldname> --new <newname>\n";
+    }
+    # 'print-rra' usage
+    elsif ($usage_command eq 'print-rra') {
+        $usage_string = "Usage: $0 print-rra --file <filename> [--full]\n";
+    }
+    # 'add-rra' usage
+    elsif ($usage_command eq 'add-rra') {
+        $usage_string = "Usage: $0 add-rra --file <filename> --string <rrastring>\n";
+    }
+    # 'delete-rra' usage
+    elsif ($usage_command eq 'delete-rra') {
+        $usage_string = "Usage: $0 delete-rra --file <filename> --id <id1>[,<id2>,...]\n";
+    }
+    # 'resize-rows-rra' usage
+    elsif ($usage_command eq 'resize-rows-rra') {
+        $usage_string = "Usage: $0 resize-rows-rra --file <filename> --id <id> --torows <newrows>\n";
+    }
+    # 'resize-step-rra' usage
+    elsif ($usage_command eq 'resize-step-rra') {
+        ($usage_string = <<"        EOF") =~ s/^ {12}//gm;
+            Usage: $0 resize-step-rra --file <filename> --id <id> --tostep <newstep> 
+                   [--with-add|--with-step|--with-interpolation] [--schedule]
+        EOF
+    }
+    # Error - Invalid command
+    else {
+        print "Command does not exits\n";
+        exit 1;
+    }
+
+    # Add help if it isn't called from help
+    if ($from_help eq 0) {
+        print $usage_string;
+        if ($usage_command eq '') {
+            print "For help: $0 --help\n";
+        } else {
+            print "For help: $0 $usage_command --help\n";
+        }
+    }
+    # If called from help, return a string
+    else {
+        return $usage_string;
+    }
 }
-
-# Commands usage
-my $usage_print_ds = "Usage: $0 print-ds --file <filename> [--full]";
-my $usage_add_ds = "Usage: $0 add-ds --file <filename> --string <dsstring>";
-my $usage_delete_ds = "Usage: $0 delete-ds --file <filename> --name <name1>[,<name2>,...] [--ignore]";
-my $usage_rename_ds = "Usage: $0 rename-ds --file <filename> --old <oldname> --new <newname>";
-my $usage_print_rra = "Usage: $0 print-rra --file <filename> [--full]";
-my $usage_add_rra = "Usage: $0 add-rra --file <filename> --string <rrastring>";
-my $usage_delete_rra = "Usage: $0 delete-rra --file <filename> --id <id1>[,<id2>,...]";
-my $usage_resize_rows_rra = "Usage: $0 resize-rows-rra --file <filename> --id <id> --torows <newrows>";
-my $usage_resize_step_rra =        "Usage: $0 resize-step-rra --file <filename> --id <id> --tostep <newstep> " . 
-        "[<algorithm>] [<algorithm-options>]";
-my $usage_resize_step_rra_where =  "       where: <algorithm> = --with-add|--with-step|--with-interpolation";
-my $usage_resize_step_rra_where2 = "       and --with-add can use the option: --schedule";
-
-
-# TODO Help for every command
 
 # Help
 sub help {
@@ -73,99 +131,118 @@ sub help {
     # Help for a specific command?
     $help_command = $_[0] if scalar(@_) eq 1;
 
-    my $help_header = <<EOF;
-$0 - v$VERSION - $AUTHOR <$AUTHOR_EMAIL>
+    # Header
+    (my $help_header = <<"    EOF") =~ s/^ {8}//gm;
+        $0 - v$VERSION - $AUTHOR <$AUTHOR_EMAIL>
 
-Copyright (c) $YEAR $AUTHOR and individual contributors.
-This software is released under the Revised BSD License.
+        Command line tool that edit RRDs, like add/remove DS and add/remove/resize RRAs.
+        It uses the RRD::Editor and RRDs perl modules.
+    EOF
 
-Command line tool that edit RRDs, like add/remove DS and add/remove/resize RRAs.
-It uses the RRD::Editor and RRDs perl modules.
-EOF
-   
-    # Generic Help
+    # Usage
+    my $help_usage = usage($help_command, 1);
+    
+    my $help_string = '';
+    # Generic help
     if ($help_command eq '') {
-        print "$help_header\n";
-        usage();
-            
-        print <<EOF;
 
-GENERAL OPTIONS:
-    
-    --help: Print this help
-    --usage: Print the usage
+        # Other usage strings
+        my $usage_print_ds = usage('print-ds', 1);
+        my $usage_add_ds = usage('add-ds', 1);
+        my $usage_delete_ds = usage('delete-ds', 1);
+        my $usage_rename_ds = usage('rename-ds', 1);
+        my $usage_print_rra = usage('print-rra', 1);
+        my $usage_add_rra = usage('add-rra', 1);
+        my $usage_delete_rra = usage('delete-rra', 1);
+        my $usage_resize_rows_rra = usage('resize-rows-rra', 1);
+        my $usage_resize_step_rra = usage('resize-step-rra', 1);
 
-COMMANDS:
+        # Indent multiple-lines usage strings
+        # Only indent lines after the first line
+        # TODO Find a better solution 
+        $usage_resize_step_rra =~ s/^(.*)$/                    $1/gm;
+        $usage_resize_step_rra =~ s/^ {20}//;
 
-    print-ds
-        
-        Print information about all datasources of an RRD
+        # Help string
+        ($help_string = <<"        EOF") =~ s/^ {12}//gm;
+            GENERAL OPTIONS:
+                
+                --help: Print this help
+                --usage: Print the usage
 
-        $usage_print_ds
+            COMMANDS:
 
-    add-ds
+                print-ds
+                    
+                    Print information about all datasources of an RRD
 
-        Add one datasource in an RRD
+                    $usage_print_ds
+                add-ds
 
-        $usage_add_ds
+                    Add one datasource in an RRD
 
-    delete-ds
+                    $usage_add_ds
+                delete-ds
 
-        Delete one or more datasources from an RRD
+                    Delete one or more datasources from an RRD
 
-        $usage_delete_ds
+                    $usage_delete_ds
+                rename-ds
 
-    rename-ds
+                    Rename a datasource of an RRD
 
-        Rename a datasource of an RRD
+                    $usage_rename_ds
+                print-rra
 
-        $usage_rename_ds
+                    Print information about all RRAs of an RRD
+                
+                    $usage_print_rra
+                add-rra
 
-    print-rra
+                    Add one RRA in an RRD
 
-        Print information about all RRAs of an RRD
-    
-        $usage_print_rra
+                    $usage_add_rra
+                delete-rra
 
-    add-rra
+                    Delete one or more RRA from an RRD
 
-        Add one RRA in an RRD
+                    $usage_delete_rra
+                resize-rows-rra
 
-        $usage_add_rra
+                    Resize the number of rows of an RRA of an RRD.
+                    The step will be the same. The time will be resized according with the new number of rows.
 
-    delete-rra
+                    $usage_resize_rows_rra
+                resize-step-rra
 
-        Delete one or more RRA from an RRD
+                    Resize the step of an RRA of an RRD.
+                    The time will be the same. The number of rows will be resized to maintain the time constant.
 
-        $usage_delete_rra
+                    $usage_resize_step_rra
+            COMMAND HELP:
 
-    resize-rows-rra
-
-        Resize the number of rows of an RRA of an RRD.
-        The step will be the same. The time will be resized according with the new number of rows.
-
-        $usage_resize_rows_rra
-
-    resize-step-rra
-
-        Resize the step of an RRA of an RRD.
-        The time will be the same. The number of rows will be resized to maintain the time constant.
-
-        $usage_resize_step_rra
-        $usage_resize_step_rra_where
-        $usage_resize_step_rra_where2
-
-COMMAND HELP:
-
-    Usage: $0 <subcommand> --help
-
-EOF
-
-    exit 0;
-    } else {
-        print "BAD NEWS: We not implemented 'help' for this command yet. :(\n";
-        exit 0;
+                Usage: $0 <subcommand> --help
+        EOF
     }
+    # 'print-ds' help
+    elsif ($help_command eq 'print-ds') {
+        # Help string
+        ($help_string = <<"        EOF") =~ s/^ {12}//gm;
+            OPTIONS:
+                
+                --file: Name of the RRD file
+                --full: Print extended informations 
+        EOF
+    }
+    else {
+        print "BAD NEWS: We not implemented 'help' for this command yet. :(\n";
+        exit 1;
+    }
+    
+    # Print help
+    print "$help_header\n";
+    print "$help_usage\n";
+    print "$help_string\n";
 
 }
 
@@ -177,8 +254,7 @@ EOF
 sub recovery {
     my $file = $_[0];
     # XML file for recovery purpose
-    my $file_xml = $file;
-    $file_xml =~ s/\.rrd/\.xml/;
+    (my $file_xml = $file) =~ s/\.rrd/\.xml/;
     RRDs::dump($file, $file_xml);
     unlink($file);
     RRDs::restore($file_xml, $file);
@@ -293,13 +369,21 @@ if (not grep $_ eq $command, @validcommands) {
     help() and exit 0 if $help;
     usage() and exit 0 if $usage;
     # Invalid command
-    print "Invalid syntax\n" and usage() and exit 1;
+    print "Invalid subcommand name\n" and usage() and exit 1;
 }
+
+# At least two arguments
+# If was set only the subcommand, print usage
+if (scalar(@ARGV) eq 1) {
+    usage($command);
+	exit 1;
+} 
+
 
 # Vars
 #
 # Generic
-my ($help, $file) = ('', '');
+my ($usage, $help, $file) = ('', '', '');
 # Print
 my $full = '';
 # DS
@@ -313,16 +397,17 @@ my $torows = '';
 # RRA resize step
 my ($tostep, $with_add, $with_step, $with_interpolation, $schedule) = ('', '', '', '', '');
 # Parsing vars
-GetOptions ('help' => \$help, 'file=s' => \$file, 'full' => \$full, 'name=s' => \$name, 'ignore' => \$ignore, 
-        'old=s' => \$old, 'new=s' => \$new, 'id=s' => \$id, 'torows=i' => \$torows, 'tostep=i' => \$tostep, 
-        'with-add' => \$with_add, 'with-step' => \$with_step, 'with-interpolation' => \$with_interpolation, 
-        'schedule' => \$schedule);
+GetOptions ('usage' => \$usage, 'help' => \$help, 'file=s' => \$file, 'full' => \$full, 'name=s' => \$name, 
+        'ignore' => \$ignore, 'old=s' => \$old, 'new=s' => \$new, 'id=s' => \$id, 'torows=i' => \$torows, 
+        'tostep=i' => \$tostep, 'with-add' => \$with_add, 'with-step' => \$with_step, 
+        'with-interpolation' => \$with_interpolation, 'schedule' => \$schedule);
 my @names = split(/,/,$name);
 my @ids = split(/,/,$id);
 
 
-# Help of a command
+# Help and usage of a command
 help($command) and exit 0 if $help;
+usage($command) and exit 0 if $usage;
 
 # Error
 print "Syntax error. You must pass one file as argument.\n" and usage() and
@@ -472,8 +557,7 @@ if ($command eq "resize-step-rra") {
         # See: http://linux.die.net/man/1/at
         my $time_hours =  $orig_time / 3600;
         print "Old RRA (id=$id) expires in $time_hours hours.\n";
-        my $script_name = $0;
-        $script_name =~ s{./}{};
+        (my $script_name = $0) =~ s{./}{};
         my $at_string = sprintf "%s/%s delete-rra --file %s --id %s", $ENV{PWD}, $script_name, $file, $id;
         my $script_string = "echo \"$at_string\" | at now + $time_hours hours";
         
