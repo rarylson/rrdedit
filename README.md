@@ -45,7 +45,7 @@ To print information:
 To edit datasources:
 
     # Delete two datasources
-    ./rrdedit.pl delete-ds --file test/ping_rta.rrd --names min,warn
+    ./rrdedit.pl delete-ds --file test/ping_rta.rrd --name min,warn
 
 To edit RRA:
 
@@ -61,7 +61,7 @@ To get help:
     # Usage
     ./rrdedit.pl --usage
 
-    # Help (not yet implemented)
+    # Help
     ./rrdedit.pl --help
 
 

@@ -23,24 +23,147 @@ use Math::Interpolator::Knot;
 use Data::Printer;
 use Time::HiRes;
 
+# Version and author
+our $VERSION = '1-beta';
+our $YEAR = '2013';
+our $AUTHOR = 'Rarylson Freitas';
+our $AUTHOR_EMAIL = 'rarylson@vialink.com.br';
+
 # ENV vars
-# - DEBUG => Print debug info
-# - DEBUG_TIME => Print exec time info
+# DEBUG => Print debug info
+# DEBUG_TIME => Print exec time info
 
 # DEBUG TIME
 my $start_run = Time::HiRes::time();
+
+# TODO like help, usage for every command
 
 # Usage
 sub usage {
 	print "Usage: $0 <subcommand> ...\n";
 	print "       where: <subcommand> = add-ds|delete-ds|rename-ds|print-ds|\n" . 
           "                             add-rra|delete-rra|resize-rows-rra|resize-step-rra|print-rra\n";
-	print "For a complete help, use: $0 --help\n";
+	print "       Use: $0 --help for help\n";
 }
+
+# Commands usage
+my $usage_print_ds = "Usage: $0 print-ds --file <filename> [--full]";
+my $usage_add_ds = "Usage: $0 add-ds --file <filename> --string <dsstring>";
+my $usage_delete_ds = "Usage: $0 delete-ds --file <filename> --name <name1>[,<name2>,...] [--ignore]";
+my $usage_rename_ds = "Usage: $0 rename-ds --file <filename> --old <oldname> --new <newname>";
+my $usage_print_rra = "Usage: $0 print-rra --file <filename> [--full]";
+my $usage_add_rra = "Usage: $0 add-rra --file <filename> --string <rrastring>";
+my $usage_delete_rra = "Usage: $0 delete-rra --file <filename> --id <id1>[,<id2>,...]";
+my $usage_resize_rows_rra = "Usage: $0 resize-rows-rra --file <filename> --id <id> --torows <newrows>";
+my $usage_resize_step_rra =        "Usage: $0 resize-step-rra --file <filename> --id <id> --tostep <newstep> " . 
+        "[<algorithm>] [<algorithm-options>]";
+my $usage_resize_step_rra_where =  "       where: <algorithm> = --with-add|--with-step|--with-interpolation";
+my $usage_resize_step_rra_where2 = "       and --with-add can use the option: --schedule";
+
+
+# TODO Help for every command
 
 # Help
 sub help {
-    print "BAD NEWS: We not implemented 'help' yet. :(\n";
+    my $help_command = '';
+
+    # Help for a specific command?
+    $help_command = $_[0] if scalar(@_) eq 1;
+
+    my $help_header = <<EOF;
+$0 - v$VERSION - $AUTHOR <$AUTHOR_EMAIL>
+
+Copyright (c) $YEAR $AUTHOR and individual contributors.
+This software is released under the Revised BSD License.
+
+Command line tool that edit RRDs, like add/remove DS and add/remove/resize RRAs.
+It uses the RRD::Editor and RRDs perl modules.
+EOF
+   
+    # Generic Help
+    if ($help_command eq '') {
+        print "$help_header\n";
+        usage();
+            
+        print <<EOF;
+
+GENERAL OPTIONS:
+    
+    --help: Print this help
+    --usage: Print the usage
+
+COMMANDS:
+
+    print-ds
+        
+        Print information about all datasources of an RRD
+
+        $usage_print_ds
+
+    add-ds
+
+        Add one datasource in an RRD
+
+        $usage_add_ds
+
+    delete-ds
+
+        Delete one or more datasources from an RRD
+
+        $usage_delete_ds
+
+    rename-ds
+
+        Rename a datasource of an RRD
+
+        $usage_rename_ds
+
+    print-rra
+
+        Print information about all RRAs of an RRD
+    
+        $usage_print_rra
+
+    add-rra
+
+        Add one RRA in an RRD
+
+        $usage_add_rra
+
+    delete-rra
+
+        Delete one or more RRA from an RRD
+
+        $usage_delete_rra
+
+    resize-rows-rra
+
+        Resize the number of rows of an RRA of an RRD.
+        The step will be the same. The time will be resized according with the new number of rows.
+
+        $usage_resize_rows_rra
+
+    resize-step-rra
+
+        Resize the step of an RRA of an RRD.
+        The time will be the same. The number of rows will be resized to maintain the time constant.
+
+        $usage_resize_step_rra
+        $usage_resize_step_rra_where
+        $usage_resize_step_rra_where2
+
+COMMAND HELP:
+
+    Usage: $0 <subcommand> --help
+
+EOF
+
+    exit 0;
+    } else {
+        print "BAD NEWS: We not implemented 'help' for this command yet. :(\n";
+        exit 0;
+    }
+
 }
 
 # Recovery RRD
@@ -50,7 +173,6 @@ sub help {
 # In these cases, dump and restore the RRD will recovery the RRD database. 
 sub recovery {
     my $file = $_[0];
-    
     # XML file for recovery purpose
     my $file_xml = $file;
     $file_xml =~ s/\.rrd/\.xml/;
@@ -115,26 +237,31 @@ sub change_rra {
 # Update a RRD using cache
 # Concat the new update string into the cache array
 # If the total number of cached updates reaches the max value, then flush the cache
-# Notes:
-# - RRD already have a lot of I/O performance improvements.
-#   See: http://oss.oetiker.ch/rrdtool-trac/wiki/TuningRRD
-#   However, the write operation have some headers calculation overhead
-#   See: http://net.doit.wisc.edu/~dwcarder/rrdcache/
-#   So, less update calls improve the performance
-# - If you need more performance, use the rrdcached deamon
-#   See: http://oss.oetiker.ch/rrdtool/doc/rrdcached.en.html           
+#
+# RRD:Editor->update flushs to disk and closes the file descriptor. There is no cache and it's slow.
+# See: https://rt.cpan.org/Public/Bug/Display.html?id=86596
+# Although RRD already has a lot of I/O performance improvements (http://oss.oetiker.ch/rrdtool-trac/wiki/TuningRRD),
+# the write operation has some header calculation overhead.
+# See: http://net.doit.wisc.edu/~dwcarder/rrdcache/
+# So, we are using RRDs::update and cache.
+# To understand how to pass many args in perl
+# See: http://www.cs.cf.ac.uk/Dave/PERL/node61.html
+# Note: If you need more performance, use the rrdcached deamon
+#       See: http://oss.oetiker.ch/rrdtool/doc/rrdcached.en.html           
 my $CACHE_MAX = 1024;
 my @update_cache_array = ();
 my $update_cache_count = 0;
 sub update_cache_rrd {
     my ($file, $update_string) = @_;
+    # Add string to cache
     push @update_cache_array, $update_string;
     $update_cache_count++;
+    # Flush if it's needed
     update_flush_rrd($file) if $update_cache_count eq $CACHE_MAX;
 }
 sub update_flush_rrd {
     my ($file) = @_;
-    # Return if it already empty
+    # Return if it's already empty
     return if scalar(@update_cache_array) eq 0;
     # Flush to disk
     RRDs::update($file, @update_cache_array);
@@ -148,42 +275,51 @@ if (scalar(@ARGV) eq 0) {
 	exit 1;
 } 
 
-# Help and usage
-my $help = '';
-my $usage = '';
-GetOptions ('help' => \$help, 'usage' => \$usage);
-help() and exit 0 if $help;
-usage() and exit 0 if $usage;
-
-# Parse
-my @validcommands = ("add-ds", "delete-ds", "rename-ds", "print-ds", "add-rra", "delete-rra", "resize-rows-rra", 
-        "resize-step-rra", "print-rra");
+# Commands
+my @validcommands = ("add-ds", "delete-ds", "rename-ds", "print-ds", "add-rra", "delete-rra", 
+        "resize-rows-rra", "resize-step-rra", "print-rra");
+# Parse command
 my $command = $ARGV[0];
-print "Invalid command name.\n" and usage() and exit 1 if ! grep $_ eq $command, @validcommands;
 
-# Parse vars
-my $file = '';
+# No command
+if (! grep $_ eq $command, @validcommands) {
+    # Generic options (help and usage)
+    my $help = '';
+    my $usage = '';
+    GetOptions ('help' => \$help, 'usage' => \$usage);
+    help() and exit 0 if $help;
+    usage() and exit 0 if $usage;
+    # Invalid command
+    print "Invalid syntax\n" and usage() and exit 1;
+}
+
+# Vars
+#
+# Generic
+my ($help, $file) = ('', '');
+# Print
 my $full = '';
-my $name = '';
-my $names = '';
-my $ignore = '';
-my $old = '';
-my $new = '';
-my $string = '';
-my $id = '';
-my $ids = '';
+# DS
+my ($name, $names) = ('', '');
+# DS Delete
+my ($ignore, $old, $new) = ('', '', '');
+# RRA
+my ($id, $ids) = ('', '');
+# RRA resize row
 my $torows = '';
-my $tostep = '';
-my $with_add = '';
-my $with_step = '';
-my $with_interpolation = '';
-my $schedule = '';
-GetOptions ('file=s' => \$file, 'full' => \$full, 'name=s' => \$name, 'ignore' => \$ignore, 'old=s' => \$old, 'new=s' => \$new, 
-        'id=s' => \$id, 'torows=i' => \$torows, 'tostep=i' => \$tostep, 'with-add' => \$with_add, 'with-step' => \$with_step, 
-        'with-interpolation' => \$with_interpolation, 'schedule' => \$schedule);
+# RRA resize step
+my ($tostep, $with_add, $with_step, $with_interpolation, $schedule) = ('', '', '', '', '');
+# Parsing vars
+GetOptions ('help' => \$help, 'file=s' => \$file, 'full' => \$full, 'name=s' => \$name, 'ignore' => \$ignore, 
+        'old=s' => \$old, 'new=s' => \$new, 'id=s' => \$id, 'torows=i' => \$torows, 'tostep=i' => \$tostep, 
+        'with-add' => \$with_add, 'with-step' => \$with_step, 'with-interpolation' => \$with_interpolation, 
+        'schedule' => \$schedule);
 my @names = split(/,/,$name);
 my @ids = split(/,/,$id);
 
+
+# Help of a command
+help($command) and exit 0 if $help;
 
 # Error
 print "Syntax error. You must pass one file as argument.\n" and usage() and
@@ -239,8 +375,8 @@ if ($command eq "print-rra") {
     print "Number of RRAs: $num_rra\n";
     print "Minimum step size: $minstep\n";
     # RRAs doesn't have names. They're indexed from 0 to num_RRAs()-1.
-    # Print number of rows foreach RRA
     # See: http://search.cpan.org/~dougleith/RRD-Editor/lib/RRD/Editor.pm#num_RRAs
+    # Print number of rows, step and other informations foreach RRA
     foreach my $i (0 .. $num_rra-1) {
         printf "RRA %s:\n\tStep: %s\n\tRows: %s\n", $i, $rrd->RRA_step($i), $rrd->RRA_numrows($i);
         my $totaltime = $rrd->RRA_step($i) * $rrd->RRA_numrows($i);
@@ -440,10 +576,6 @@ if ($command eq "resize-step-rra") {
                 $value = "U" if ! defined $value;
             }
             $update_string = sprintf "%d:%s", $timestamp, join(":", @iter_data);
-            # RRD:Editor->update flushs to disk and closes the file descriptor. There is no cache and it's slow.
-            # See: https://rt.cpan.org/Public/Bug/Display.html?id=86596
-            # Call update using RRDs::update with cached args
-            # http://www.cs.cf.ac.uk/Dave/PERL/node61.html
             update_cache_rrd($new_file, $update_string);
         }
         # Flush if there is some cache
