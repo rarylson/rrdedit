@@ -8,6 +8,7 @@
 #      http://search.cpan.org/~dougleith/RRD-Editor/lib/RRD/Editor.pm
 #      http://oss.oetiker.ch/rrdtool/prog/RRDs.en.html
 
+use 5.10.0;
 use strict;
 use warnings;
 
@@ -112,30 +113,32 @@ sub change_rra {
 }
 
 # Update a RRD using cache
-# Concat the new update string into the cache
+# Concat the new update string into the cache array
 # If the total number of cached updates reaches the max value, then flush the cache
 # Notes:
-#   RRD already have a lot of I/O performance improvements.
+# - RRD already have a lot of I/O performance improvements.
 #   See: http://oss.oetiker.ch/rrdtool-trac/wiki/TuningRRD
 #   However, the write operation have some headers calculation overhead
 #   See: http://net.doit.wisc.edu/~dwcarder/rrdcache/
 #   So, less update calls improve the performance
-#   If you need more performance, use the rrdcached deamon
+# - If you need more performance, use the rrdcached deamon
 #   See: http://oss.oetiker.ch/rrdtool/doc/rrdcached.en.html           
 my $CACHE_MAX = 1024;
-my $update_cache_string = "";
+my @update_cache_array = ();
 my $update_cache_count = 0;
 sub update_cache_rrd {
-    my ($rrd, $update_string) = @_;
-    $update_cache_string .= " " if $update_cache_string;
-    $update_cache_string .= $update_string;
+    my ($file, $update_string) = @_;
+    push @update_cache_array, $update_string;
     $update_cache_count++;
-    update_flush_rrd($rrd) if $update_cache_count eq $CACHE_MAX;
+    update_flush_rrd($file) if $update_cache_count eq $CACHE_MAX;
 }
 sub update_flush_rrd {
-    my ($rrd) = @_;
-    $rrd->update($update_cache_string) if $update_cache_string;
-    $update_cache_string = "";
+    my ($file) = @_;
+    # Return if it already empty
+    return if scalar(@update_cache_array) eq 0;
+    # Flush to disk
+    RRDs::update($file, @update_cache_array);
+    @update_cache_array = ();
     $update_cache_count = 0;
 }
 
@@ -222,7 +225,7 @@ if ($command eq "delete-ds") {
     $rrd->save();
     $rrd->close();
     # After RRD::Editor->delete_DS, the RRD header can be inconsistent, with a wrong size.
-    # So, recovery RRD usind dump+restore
+    # So, recovery RRD
     recovery($file);
     print "All DS deleted\n";
     exit 0;
@@ -276,15 +279,14 @@ if ($command eq "resize-rows-rra") {
 
 # Resize RRAs - Step
 if ($command eq "resize-step-rra") {
-    # This command changes the step and row values to mantein the same period.
+    # This command changes the step and row values and manteins the same period.
     # Example: If the step is divided by two, the number of rows is duplicated
     #
-    # According to RRD::Editor, "changing the step size is hard as it would require resampling the data stored in the RRA".
-    # So, they "leave this 'to do'".
+    # According to RRD::Editor, "changing the step size is hard as it would require resampling 
+    # the data stored in the RRA". So, they didn't implement this.
     # See: http://search.cpan.org/~dougleith/RRD-Editor/lib/RRD/Editor.pm#RRA_step
     #
-    # How can we implement this?
-    # 3 algothims: with-add, with-step or with-interpolation
+    # We propose three methods to implement this: with-add, with-step or with-interpolation
     # See: RRA_STEP.md
 
     # Error
@@ -387,11 +389,9 @@ if ($command eq "resize-step-rra") {
             my $iter_step = $rra_sort[$i]->[1];
             my $iter_rows = $rra_sort[$i]->[2];
             my $iter_time = $iter_step * $iter_rows;
-            my $start_time = $end_time-$iter_time;
+            my $start_time = $end_time - $iter_time;
 
             # RRDs::fetch is better than RRD::editor->fetch
-            # Notes: $dsnames is a pointer to an array; $data is a pointer to an array that all elements also
-            #        are a ponter to an array
             # See: http://oss.oetiker.ch/rrdtool/prog/RRDs.en.html
             my ($iter_start, $real_step, undef, $data) = RRDs::fetch($file, "AVERAGE", "-r", $iter_step, "-s", $start_time, 
                     "-e", $end_time-$iter_step);
@@ -410,7 +410,7 @@ if ($command eq "resize-step-rra") {
 
         # DEBUG TIME
         my $run_time = Time::HiRes::time() - $start_run;;
-        print "DEBUG: From start to this moment: $run_time\n" if $ENV{"DEBUG_TIME"};
+        print "From start to this moment: $run_time\n" if $ENV{"DEBUG_TIME"};
         $start_run = Time::HiRes::time();
 
         # Interpolation is only needed when new step is smaller then orig step. That is, the new rra is more precise
@@ -418,7 +418,7 @@ if ($command eq "resize-step-rra") {
             # With step (--with-step)
             # Insert new points using the step function
             if ($with_step) {
-
+                print "Not yet implemented :(\n" and exit 1;
             }
             # With interpolation (--with-interpolation)
             # Insert new points using a smooth interpolation
@@ -429,8 +429,8 @@ if ($command eq "resize-step-rra") {
 
         # Save data in the new RRD
         print "Inserting new points\n" if $ENV{"DEBUG"};
-        my $rrd_new = RRD::Editor->new();
-        $rrd_new->open($new_file);
+        #my $rrd_new = RRD::Editor->new();
+        #$rrd_new->open($new_file);
         my $update_string = '';
         foreach my $timestamp (sort keys %data_hash) {
             my $temp_data = $data_hash{$timestamp};
@@ -440,24 +440,21 @@ if ($command eq "resize-step-rra") {
                 $value = "U" if ! defined $value;
             }
             $update_string = sprintf "%d:%s", $timestamp, join(":", @iter_data);
-            # RRD:Editor->update flushs to disk and closes the file descriptor.
-            # There is no cache and it's slow.
+            # RRD:Editor->update flushs to disk and closes the file descriptor. There is no cache and it's slow.
             # See: https://rt.cpan.org/Public/Bug/Display.html?id=86596
-            # Call update using a cache
-            # TODO Para usar o cache com o RRDs::Update, temos que contatenar as strings em um array
+            # Call update using RRDs::update with cached args
             # http://www.cs.cf.ac.uk/Dave/PERL/node61.html
-            update_cache_rrd($rrd_new, $update_string);
-            #$rrd_new->update($update_string);
+            update_cache_rrd($new_file, $update_string);
         }
         # Flush if there is some cache
-        update_flush_rrd($rrd_new);
+        update_flush_rrd($new_file);
         # Not running RRD::Editor->save because the update function already closes the RRD::Editor object.
-        $rrd_new->close();
+        #$rrd_new->close();
         print "Points inserted\n" if $ENV{"DEBUG"};
         
         # DEBUG_TIME
         $run_time = Time::HiRes::time() - $start_run;
-        print "DEBUG: From 'insert points' to this moment: $run_time\n" if $ENV{"DEBUG_TIME"};
+        print "From 'insert points' to this moment: $run_time\n" if $ENV{"DEBUG_TIME"};
         
         # Overwrite the original RRD with the new RRD
         rename($new_file, $file);
