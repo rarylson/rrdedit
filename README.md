@@ -17,16 +17,25 @@ Currently, there are only these funcionalities:
 Requirements
 ------------
 
+Perl version 5.10.0 or newer (if you are using Ubuntu):
+
+    apt-get install perl
+
 RRDTool (if you are using Ubuntu):
 
     apt-get install rrdtool
 
 Perl Modules:
 
-    cpan install ExtUtils::MakeMaker
-    cpan install RRD::Editor
+    cpan install ExtUtils::MakeMaker RRD::Editor
+    cpan install RRD::Tweak
+    cpan install Scalar::Util::Numeric
     cpan install Math::Interpolator
+    cpan install Data::Printer Time::HiRes
 
+To install CPAN (if you are using Ubuntu):
+
+    apt-get install perl-modules
 
 Quick start
 -----------
