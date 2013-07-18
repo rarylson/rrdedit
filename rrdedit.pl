@@ -100,7 +100,7 @@ sub usage {
     }
     # Error - Invalid command
     else {
-        print "Command does not exits\n";
+        say "Command does not exits";
         exit 1;
     }
 
@@ -108,9 +108,9 @@ sub usage {
     if ($from_help == 0) {
         print $usage_string;
         if ($usage_command eq '') {
-            print "For help: $0 --help\n";
+            say "For help: $0 --help";
         } else {
-            print "For help: $0 $usage_command --help\n";
+            say "For help: $0 $usage_command --help";
         }
     }
     # If called from help, return a string
@@ -230,14 +230,14 @@ sub help {
         EOF
     }
     else {
-        print "BAD NEWS: We not implemented 'help' for this command yet. :(\n";
+        say "BAD NEWS: We not implemented 'help' for this command yet. :(";
         exit 1;
     }
     
     # Print help
-    print "$help_header\n";
-    print "$help_usage\n";
-    print "$help_string\n";
+    say $help_header;
+    say $help_usage;
+    say $help_string;
 
 }
 
@@ -364,7 +364,7 @@ if (not grep $_ eq $command, @validcommands) {
     help() and exit 0 if $help;
     usage() and exit 0 if $usage;
     # Invalid command
-    print "Invalid subcommand name\n" and usage() and exit 1;
+    say "Invalid subcommand name" and usage() and exit 1;
 }
 
 # At least two arguments
@@ -405,7 +405,7 @@ help($command) and exit 0 if $help;
 usage($command) and exit 0 if $usage;
 
 # Error
-print "Syntax error. You must pass one file as argument.\n" and usage() and
+say "Syntax error. You must pass one file as argument." and usage() and
         exit 1 if not $file;
 
 # Open RRD
@@ -416,12 +416,12 @@ $rrd->open($file);
 if ($command eq "print-ds") {
     # Print
     my @dsnames = $rrd->DS_names();
-    print "DS names: @dsnames\n";
+    say "DS names: @dsnames";
     # Print full
     if ($full) {
         my @infos = split /\n/, $rrd->info();
         foreach my $info (@infos) {
-            print "$info\n" if $info =~ /^ds/;
+            say $info if $info =~ /^ds/;
         }
     }
 	$rrd->close();
@@ -431,7 +431,7 @@ if ($command eq "print-ds") {
 # Delete data sources
 if ($command eq "delete-ds") {
     # Error
-	print "Syntax error. You must pass one or more data source names to be deleted.\n" and usage() and
+	say "Syntax error. You must pass one or more data source names to be deleted." and usage() and
             exit 1 if not @names;
     # Deleting
     printf "Deleting: %s...\n", @names;
@@ -446,7 +446,7 @@ if ($command eq "delete-ds") {
     # After RRD::Editor->delete_DS, the RRD header can be inconsistent, with a wrong size.
     # So, recovery RRD
     recovery($file);
-    print "All DS deleted\n";
+    say "All DS deleted";
     exit 0;
 }
 
@@ -455,8 +455,8 @@ if ($command eq "print-rra") {
     # Print
     my $num_rra = $rrd->num_RRAs();
     my $minstep = $rrd->minstep();
-    print "Number of RRAs: $num_rra\n";
-    print "Minimum step size: $minstep\n";
+    say "Number of RRAs: $num_rra";
+    say "Minimum step size: $minstep";
     # RRAs doesn't have names. They're indexed from 0 to num_RRAs()-1.
     # See: http://search.cpan.org/~dougleith/RRD-Editor/lib/RRD/Editor.pm#num_RRAs
     # Print number of rows, step and other informations foreach RRA
@@ -469,7 +469,7 @@ if ($command eq "print-rra") {
     if ($full) {
         my @infos = split /\n/, $rrd->info();
         foreach my $info (@infos) {
-            print "$info\n" if $info =~ /^rra/;
+            say $info if $info =~ /^rra/;
         }
     }
 	$rrd->close();
@@ -482,17 +482,17 @@ if ($command eq "resize-rows-rra") {
     # Example: If the number of rows is duplicated, the period is duplicated too.
 
     # Error
-	print "Syntax error. You must pass one id and the new number of rows.\n" and usage() and
+	say "Syntax error. You must pass one id and the new number of rows." and usage() and
             exit 1 if not $id or not $torows;
 
     my $orig_rows = $rrd->RRA_numrows($id);
 
     # Resize 
-    print "Resizing rows of RRA $id from $orig_rows to $torows...\n";
+    say "Resizing rows of RRA $id from $orig_rows to $torows...";
     $rrd->resize_RRA($id, $torows);
     $rrd->save();
     $rrd->close();
-    print "Number of rows changed\n";
+    say "Number of rows changed";
     exit 0;
 }
 
@@ -509,10 +509,10 @@ if ($command eq "resize-step-rra") {
     # See: RRA_STEP.md
 
     # Error
-	print "Syntax error. You must pass one id and the new step.\n" and usage() and
+	say "Syntax error. You must pass one id and the new step." and usage() and
             exit 1 if not $id or not $tostep;
     $with_add = 1 if not $with_add and not $with_step and not $with_interpolation;
-    print "Syntax error. You must select only one algorithm.\n" and usage() and
+    say "Syntax error. You must select only one algorithm." and usage() and
             exit 1 if ($with_add and $with_step) or ($with_add and $with_interpolation) or 
             ($with_step and $with_interpolation);
     
@@ -531,7 +531,7 @@ if ($command eq "resize-step-rra") {
     my $newrra_string = "RRA:$orig_type:$orig_xff:$step_relative:$new_rows";
 
     # Error
-    print "Invalid value error. The step must be a multiple of the minimum step: $minstep\n" and
+    say "Invalid value error. The step must be a multiple of the minimum step: $minstep" and
             exit 1 if not Scalar::Util::Numeric::isint($step_relative);
 
     # With add (--with-add)
@@ -539,13 +539,13 @@ if ($command eq "resize-step-rra") {
     if ($with_add) {
         
         # Adding new RRA
-        print "Adding new RRA: [$newrra_string]...\n";
+        say "Adding new RRA: [$newrra_string]...";
         $rrd->add_RRA($newrra_string);
         $rrd->save();
         $rrd->close();
-        printf "New RRA added\n";
+        say "New RRA added";
         # Time changed. New rows was ceilled
-        printf "Total time changed: from $orig_time seconds to $new_time\n" if $orig_time ne $new_time;
+        say "Total time changed: from $orig_time seconds to $new_time" if $orig_time != $new_time;
         
         # Generate 'at' command to schedule the delete operation
         # 'at' is a linux tool that permits executing commands at a specified time.
@@ -558,12 +558,12 @@ if ($command eq "resize-step-rra") {
         
         # Only print the 'at' command
         if (not $schedule) {
-            print "Run this command to delete this RRA after it's no more necessary:\n"; 
-            printf "    $script_string\n";
+            say "Run this command to delete this RRA when it's no more necessary:"; 
+            say "    $script_string";
         }
         # Schedule the delete operation (--schedule)
         else {
-            print "Scheduling delete operation: $at_string\n";
+            say "Scheduling delete operation: $at_string";
             `$script_string`;
         }
 
@@ -578,15 +578,15 @@ if ($command eq "resize-step-rra") {
         # See: http://ds9a.nl/rrd-mini-howto/cvs/rrd-mini-howto/output/rrd-mini-howto-1.html#ss1.3
         #      https://lists.oetiker.ch/pipermail/rrd-users/2012-June/018661.html 
         
-        print "Resizing step of RRA $id from $orig_step to $tostep...\n";
+        say "Resizing step of RRA $id from $orig_step to $tostep...";
         # Create the new RRA
-        print "Creating new RRD structure\n" if $ENV{"DEBUG"};
+        say "Creating new RRD structure" if $ENV{"DEBUG"};
         $rrd->close();
         my $new_file = $file . ".new";
         change_rra($file, $new_file, $id, $tostep, $new_rows, $newrra_string);
-        print "New RRD structure created\n" if $ENV{"DEBUG"};
+        say "New RRD structure created" if $ENV{"DEBUG"};
         # Time changed. New rows was ceilled
-        printf "RRA time changed: from $orig_time seconds to $new_time\n" if $orig_time ne $new_time;
+        say "RRA time changed: from $orig_time seconds to $new_time" if $orig_time ne $new_time;
 
         # Create RRA array and sort by precision (step)
         my @rra_sort;
@@ -599,7 +599,7 @@ if ($command eq "resize-step-rra") {
         @rra_sort = sort {$a->[1] <=> $b->[1]} @rra_sort;
 
         # Foreach RRA, fetch data
-        print "Generating points\n" if $ENV{"DEBUG"};
+        say "Generating points" if $ENV{"DEBUG"};
         my %data_hash = ();
         my @dsnames = $rrd->DS_names();
         for my $i (0 .. $num_rra - 1) {
@@ -624,11 +624,11 @@ if ($command eq "resize-step-rra") {
                 $insert_time += $iter_step; 
             }
         }
-        print "Points generated\n" if $ENV{"DEBUG"};
+        say "Points generated" if $ENV{"DEBUG"};
 
         # DEBUG TIME
         my $run_time = Time::HiRes::time() - $start_run;;
-        print "From start to this moment: $run_time\n" if $ENV{"DEBUG_TIME"};
+        say "From start to this moment: $run_time" if $ENV{"DEBUG_TIME"};
         $start_run = Time::HiRes::time();
 
         # Interpolation is only needed when new step is smaller then orig step. That is, the new rra is more precise
@@ -636,19 +636,17 @@ if ($command eq "resize-step-rra") {
             # With step (--with-step)
             # Insert new points using the step function
             if ($with_step) {
-                print "Not yet implemented :(\n" and exit 1;
+                say "Not yet implemented :(" and exit 1;
             }
             # With interpolation (--with-interpolation)
             # Insert new points using a smooth interpolation
             elsif ($with_interpolation) {
-                print "Not yet implemented :(\n" and exit 1;
+                say "Not yet implemented :(" and exit 1;
             }
         }
 
         # Save data in the new RRD
-        print "Inserting new points\n" if $ENV{"DEBUG"};
-        #my $rrd_new = RRD::Editor->new();
-        #$rrd_new->open($new_file);
+        say "Inserting new points" if $ENV{"DEBUG"};
         my $update_string = '';
         foreach my $timestamp (sort keys %data_hash) {
             my $temp_data = $data_hash{$timestamp};
@@ -662,23 +660,21 @@ if ($command eq "resize-step-rra") {
         }
         # Flush if there is some cache
         update_flush_rrd($new_file);
-        # Not running RRD::Editor->save because the update function already closes the RRD::Editor object.
-        #$rrd_new->close();
-        print "Points inserted\n" if $ENV{"DEBUG"};
+        say "Points inserted" if $ENV{"DEBUG"};
         
         # DEBUG_TIME
         $run_time = Time::HiRes::time() - $start_run;
-        print "From 'insert points' to this moment: $run_time\n" if $ENV{"DEBUG_TIME"};
+        say "From 'insert points' to this moment: $run_time" if $ENV{"DEBUG_TIME"};
         
         # Overwrite the original RRD with the new RRD
         rename($new_file, $file);
-        print "RRD migrated\n";
+        say "RRD migrated";
         exit 0;
     }
     
 }
 
 # Command not implemented yet
-print "BAD NEWS. We not implemented this feature yet.\n";
-exit 0;
+say "BAD NEWS. We not implemented this feature yet.";
+exit 1;
 
