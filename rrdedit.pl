@@ -99,9 +99,10 @@ sub usage {
         EOF
     }
     # Error - Invalid command
+    # Using die instead of 'say' when occours an logic error intead of a user input error
+    # See: http://perlmaven.com/die
     else {
-        say "Command does not exits";
-        exit 1;
+        die "Usage from unknown command";
     }
 
     # Add help if it isn't called from help
@@ -229,9 +230,9 @@ sub help {
                 --full: Print extended informations 
         EOF
     }
+    # TODO Implement help
     else {
-        say "BAD NEWS: We not implemented 'help' for this command yet. :(";
-        exit 1;
+        die "Help not implemented for command";
     }
     
     # Print help
@@ -434,12 +435,13 @@ if ($command eq "delete-ds") {
 	say "Syntax error. You must pass one or more data source names to be deleted." and usage() and
             exit 1 if not @names;
     # Deleting
-    printf "Deleting: %s...\n", @names;
+    say "Deleting: @names...";
     foreach my $dsname (@names) {
-        # If ignore was setted, not die if a dsname does not exist.
+        # Print an error if dnname does not exits. If '--ignore', continue.
+        # We print an error instead of die because occours an user input error, and not a logic error
         # See: http://affy.blogspot.com.br/p5be/ch13.htm
         eval{$rrd->delete_DS($dsname);};
-        die "DS '$dsname' does not exists\n" if $@ and not $ignore;
+        say "DS '$dsname' does not exists" and exit 1 if $@ and not $ignore;
     }
     $rrd->save();
     $rrd->close();
@@ -564,6 +566,7 @@ if ($command eq "resize-step-rra") {
         # Schedule the delete operation (--schedule)
         else {
             say "Scheduling delete operation: $at_string";
+            # TODO What is better? backslash ` or 'system function'?
             `$script_string`;
         }
 
