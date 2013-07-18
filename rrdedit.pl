@@ -44,9 +44,9 @@ sub usage {
     my $usage_string = '';
 
     # Usage for a specific command?
-    $usage_command = $_[0] if scalar(@_) ge 1;
+    $usage_command = $_[0] if scalar(@_) >= 1;
     # Usage called from help
-    $from_help = $_[1] if scalar(@_) eq 2;
+    $from_help = $_[1] if scalar(@_) == 2;
 
     # To undestand the "EOF"
     # See: http://perlmaven.com/here-documents
@@ -105,7 +105,7 @@ sub usage {
     }
 
     # Add help if it isn't called from help
-    if ($from_help eq 0) {
+    if ($from_help == 0) {
         print $usage_string;
         if ($usage_command eq '') {
             print "For help: $0 --help\n";
@@ -124,7 +124,7 @@ sub help {
     my $help_command = '';
 
     # Help for a specific command?
-    $help_command = $_[0] if scalar(@_) eq 1;
+    $help_command = $_[0] if scalar(@_) == 1;
 
     # Header
     (my $help_header = <<"    EOF") =~ s/^ {8}//gm;
@@ -331,12 +331,12 @@ sub update_cache_rrd {
     push @update_cache_array, $update_string;
     $update_cache_count++;
     # Flush if it's needed
-    update_flush_rrd($file) if $update_cache_count eq $CACHE_MAX;
+    update_flush_rrd($file) if $update_cache_count == $CACHE_MAX;
 }
 sub update_flush_rrd {
     my ($file) = @_;
     # Return if it's already empty
-    return if scalar(@update_cache_array) eq 0;
+    return if scalar(@update_cache_array) == 0;
     # Flush to disk
     RRDs::update($file, @update_cache_array);
     @update_cache_array = ();
@@ -344,7 +344,7 @@ sub update_flush_rrd {
 }
 
 # At least one argument
-if (scalar(@ARGV) eq 0) {
+if (scalar(@ARGV) == 0) {
     usage();
 	exit 1;
 } 
@@ -369,7 +369,7 @@ if (not grep $_ eq $command, @validcommands) {
 
 # At least two arguments
 # If was set only the subcommand, print usage
-if (scalar(@ARGV) eq 1) {
+if (scalar(@ARGV) == 1) {
     usage($command);
 	exit 1;
 } 
@@ -582,7 +582,7 @@ if ($command eq "resize-step-rra") {
         # Create the new RRA
         print "Creating new RRD structure\n" if $ENV{"DEBUG"};
         $rrd->close();
-        my $new_file = "$file.new";
+        my $new_file = $file . ".new";
         change_rra($file, $new_file, $id, $tostep, $new_rows, $newrra_string);
         print "New RRD structure created\n" if $ENV{"DEBUG"};
         # Time changed. New rows was ceilled
@@ -632,7 +632,7 @@ if ($command eq "resize-step-rra") {
         $start_run = Time::HiRes::time();
 
         # Interpolation is only needed when new step is smaller then orig step. That is, the new rra is more precise
-        if ($tostep lt $orig_step) {
+        if ($tostep <= $orig_step) {
             # With step (--with-step)
             # Insert new points using the step function
             if ($with_step) {
