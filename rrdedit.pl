@@ -101,6 +101,7 @@ sub usage {
     # Error - Invalid command
     # Using die instead of 'say' when occours an logic error intead of a user input error
     # See: http://perlmaven.com/die
+    #      http://perlmaven.com/writing-to-files-with-perl
     else {
         die "Usage from unknown command";
     }
@@ -271,14 +272,14 @@ sub change_rra {
     $rrd_editor->open($file);
     my $ds_num = scalar $rrd_editor->DS_names();
     my @ds_string;
-    for my $i (0 .. $ds_num - 1) {
+    foreach my $i (0 .. $ds_num - 1) {
         push @ds_string, $rrd_tweak->ds_descr($i);
     }
 
     # Get definition string for all RRAs
     my $rra_num = $rrd_editor->num_RRAs();
     my @rra_string;
-    for my $i (0 .. $rra_num - 1) {
+    foreach my $i (0 .. $rra_num - 1) {
         # Not get definition of the old RRA
         if ($i ne $old_id) {
             push @rra_string, [$i, $rrd_editor->RRA_step($i), $rrd_editor->RRA_numrows($i), $rrd_tweak->rra_descr($i)];
@@ -596,7 +597,7 @@ if ($command eq "resize-step-rra") {
         my $num_rra = $rrd->num_RRAs();
         my $end_time = $rrd->last();
         
-        for my $i (0 .. $num_rra - 1) {
+        foreach my $i (0 .. $num_rra - 1) {
             push @rra_sort, [$i, $rrd->RRA_step($i), $rrd->RRA_numrows($i)];
         }
         @rra_sort = sort {$a->[1] <=> $b->[1]} @rra_sort;
@@ -605,7 +606,7 @@ if ($command eq "resize-step-rra") {
         say "Generating points" if $ENV{"DEBUG"};
         my %data_hash = ();
         my @dsnames = $rrd->DS_names();
-        for my $i (0 .. $num_rra - 1) {
+        foreach my $i (0 .. $num_rra - 1) {
             my $iter_id = $rra_sort[$i]->[0];
             my $iter_step = $rra_sort[$i]->[1];
             my $iter_rows = $rra_sort[$i]->[2];
@@ -678,6 +679,5 @@ if ($command eq "resize-step-rra") {
 }
 
 # Command not implemented yet
-say "BAD NEWS. We not implemented this feature yet.";
-exit 1;
+die "Command not implemented";
 
