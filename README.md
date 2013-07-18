@@ -73,6 +73,11 @@ To get help:
     # Help
     ./rrdedit.pl --help
 
+    # Usage for 'delete-rra' command
+    ./rrdedit.pl delete-rra --usage
+
+    # Help for 'print-ds' command
+    ./rrdedit.pl print-ds --help
 
 And more...
 
