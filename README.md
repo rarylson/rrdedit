@@ -98,9 +98,11 @@ This plugin is very, very simple. We want to implement:
 
   ```./rrdedit.pl delete-ds -f file.rrd -n name1,name2```
 
-- A useful help and a usage for every command
+- A help for every command
 
 - Two more algorithms for resize-step-rra (You'll choose the one you prefer!)
+
+- Convert between file formats (native-double, portable-double, portable-single)
 
 - Other operations with datasource and RRA
 

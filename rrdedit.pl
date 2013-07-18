@@ -8,11 +8,6 @@
 #      http://search.cpan.org/~dougleith/RRD-Editor/lib/RRD/Editor.pm
 #      http://oss.oetiker.ch/rrdtool/prog/RRDs.en.html
 
-# TODO Add 'convert': Convert between file formats (native-double, portable-double, portable-single)
-# TODO Help for every command
-# TODO Usage for every command
-
-
 use 5.10.0;
 use strict;
 use warnings;
