@@ -119,6 +119,7 @@ sub usage {
     else {
         return $usage_string;
     }
+    return;
 }
 
 # Help
@@ -240,7 +241,8 @@ sub help {
     say $help_header;
     say $help_usage;
     say $help_string;
-
+    
+    return;
 }
 
 # Recovery RRD
@@ -256,6 +258,7 @@ sub recovery {
     unlink($file);
     RRDs::restore($file_xml, $file);
     unlink($file_xml);
+    return;
 }
 
 # Change RRA from a RRD
@@ -288,6 +291,8 @@ sub change_rra {
     # Push definition of the new RRA
     push @rra_string, [$rra_num, $new_step, $new_rows, $new_rra_string];
     # Sort RRA by precision (step)
+    # Using the '<=>' because we are performing a numeric comparison
+    # See: http://perlmaven.com/sorting-arrays-in-perl
     @rra_string = sort {$a->[1] <=> $b->[1]} @rra_string;
 
     # Calculate new RRD string
@@ -308,6 +313,7 @@ sub change_rra {
 
     # Recovery new RRD
     recovery($new_file);
+    return;
 }
 
 # Update a RRD using cache
@@ -334,6 +340,7 @@ sub update_cache_rrd {
     $update_cache_count++;
     # Flush if it's needed
     update_flush_rrd($file) if $update_cache_count == $CACHE_MAX;
+    return;
 }
 sub update_flush_rrd {
     my ($file) = @_;
@@ -343,6 +350,7 @@ sub update_flush_rrd {
     RRDs::update($file, @update_cache_array);
     @update_cache_array = ();
     $update_cache_count = 0;
+    return;
 }
 
 # At least one argument
