@@ -414,7 +414,7 @@ help($command) and exit 0 if $help;
 usage($command) and exit 0 if $usage;
 
 # Error
-say "Syntax error. You must pass one file as argument." and usage() and
+say "Syntax error. You must pass one file as argument." and usage($command) and
         exit 1 if not $file;
 
 # Open RRD
@@ -440,7 +440,7 @@ if ($command eq "print-ds") {
 # Delete data sources
 if ($command eq "delete-ds") {
     # Error
-	say "Syntax error. You must pass one or more data source names to be deleted." and usage() and
+	say "Syntax error. You must pass one or more data source names to be deleted." and usage($command) and
             exit 1 if not @names;
     # Deleting
     say "Deleting: @names...";
@@ -492,7 +492,7 @@ if ($command eq "resize-rows-rra") {
     # Example: If the number of rows is duplicated, the period is duplicated too.
 
     # Error
-	say "Syntax error. You must pass one id and the new number of rows." and usage() and
+	say "Syntax error. You must pass one id and the new number of rows." and usage($command) and
             exit 1 if not $id or not $torows;
 
     my $orig_rows = $rrd->RRA_numrows($id);
@@ -519,10 +519,10 @@ if ($command eq "resize-step-rra") {
     # See: RRA_STEP.md
 
     # Error
-	say "Syntax error. You must pass one id and the new step." and usage() and
+	say "Syntax error. You must pass one id and the new step." and usage($command) and
             exit 1 if not $id or not $tostep;
     $with_add = 1 if not $with_add and not $with_step and not $with_interpolation;
-    say "Syntax error. You must select only one algorithm." and usage() and
+    say "Syntax error. You must select only one algorithm." and usage($command) and
             exit 1 if ($with_add and $with_step) or ($with_add and $with_interpolation) or 
             ($with_step and $with_interpolation);
     
