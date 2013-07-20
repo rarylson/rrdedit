@@ -1,5 +1,4 @@
 #!/usr/bin/env perl
-#
 # Edit RRDs. Edit data sources and RRAs.
 #
 # To understand this code
@@ -119,7 +118,7 @@ sub usage {
     else {
         return $usage_string;
     }
-    return;
+    return 1;
 }
 
 # Help
@@ -242,7 +241,7 @@ sub help {
     say $help_usage;
     say $help_string;
     
-    return;
+    return 1;
 }
 
 # Recovery RRD
@@ -251,7 +250,7 @@ sub help {
 # the header.
 # In these cases, dump and restore the RRD will recovery the RRD database. 
 sub recovery {
-    my $file = $_[0];
+    my ($file) = @_;
     # XML file for recovery purpose
     (my $file_xml = $file) =~ s/\.rrd/\.xml/;
     RRDs::dump($file, $file_xml);
@@ -575,7 +574,9 @@ if ($command eq "resize-step-rra") {
         # Schedule the delete operation (--schedule)
         else {
             say "Scheduling delete operation: $at_string";
-            # TODO What is better? backslash ` or 'system function'?
+            # Using backticks instead of system
+            # See: http://stackoverflow.com/questions/799968/whats-the- \
+            #       difference-between-perls-backticks-system-and-exec/800034#800034
             `$script_string`;
         }
 

@@ -106,3 +106,4 @@ This plugin is very, very simple. We want to implement:
 
 - Other operations with datasource and RRA
 
+- Implement a complete test suit
