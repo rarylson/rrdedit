@@ -144,14 +144,32 @@ $output = `$RRDEDIT print-rra --file $TESTFILE --full | grep 'rra\\[1\\]\\.rows 
 ok $output, "resize-rows-rra - single resize";
 teardown();
 setup();
+# Number of rows test (only check size)
 `$RRDEDIT resize-rows-rra --file $TESTFILE --id 0 --torows 300`;
 $output = `$RRDEDIT print-rra --file $TESTFILE --full`;
 $output2 = 0;
 $output2 = 1 if $output =~ /rra\[0\]\.rows = 300/;
 ($output3 = $output) =~ /rra\[0\]\.cur_row = (.*)/m;
 $output3 = $1;
-ok (($output2 ne '' and $output3 == 0), "resize-rows-rra with --torows smaller than " . 
-        "the previous num rows");
+ok (($output2 ne '' and $output3 == 0), "resize-rows-rra with --torows smaller - test rows size");
+# Diff test
+`rrdtool dump $TESTFILE_COPY > $TESTDIR/$TESTFILE_NAME.old.xml`;
+`rrdtool dump $TESTFILE > $TESTDIR/$TESTFILE_NAME.new.xml`;
+# Differs only in ~300 lines
+# 09:05 only in first dump
+`diff $TESTDIR/$TESTFILE_NAME.old.xml $TESTDIR/$TESTFILE_NAME.new.xml > $TESTDIR/diff.txt`;
+my $diff_size = `cat $TESTDIR/diff.txt | wc -l | tr -d ' ' | tr -d '\\n'`;
+$output = 0;
+$output = 1 if $diff_size <= 1000;
+# 09:10 day 22, only in first dump
+my $grep1 = `grep '2013-06-22 09:10' $TESTDIR/diff.txt | wc -l | tr -d ' ' | tr -d '\\n'`;
+$output2 = 0;
+$output2 = 1 if $grep1 == 1;
+# 10:10 day 23 in both dumps
+my $grep2 = `grep '2013-06-23 10:10' $TESTDIR/diff.txt | wc -l | tr -d ' ' | tr -d '\\n'`;
+$output3 = 0;
+$output3 = 1 if $grep2 == 2;
+ok (($output and $output2 and $output3), "resize-rows-rra with --torows smaller - test diff");
 teardown();
 setup();
 `$RRDEDIT resize-rows-rra --file $TESTFILE --id 0 --torows 300`;

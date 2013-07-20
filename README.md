@@ -105,5 +105,3 @@ This plugin is very, very simple. We want to implement:
 - Convert between file formats (native-double, portable-double, portable-single)
 
 - Other operations with datasource and RRA
-
-- Implement a complete test suit
