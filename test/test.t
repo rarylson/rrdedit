@@ -148,9 +148,9 @@ setup();
 $output = `$RRDEDIT print-rra --file $TESTFILE --full`;
 $output2 = 0;
 $output2 = 1 if $output =~ /rra\[0\]\.rows = 300/;
-($output3 = $output) =~ /rra\[0\]\.cur_row = (.*)$/m;
+($output3 = $output) =~ /rra\[0\]\.cur_row = (.*)/m;
 $output3 = $1;
-ok (($output2 ne '' and $output3 != 556), "resize-rows-rra with --torows smaller than " . 
+ok (($output2 ne '' and $output3 == 0), "resize-rows-rra with --torows smaller than " . 
         "the previous num rows");
 teardown();
 setup();

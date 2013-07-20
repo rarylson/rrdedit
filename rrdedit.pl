@@ -493,7 +493,7 @@ if ($command eq "resize-rows-rra") {
 
     # Error
 	say "Syntax error. You must pass one id and the new number of rows." and usage($command) and
-            exit 1 if not $id or not $torows;
+            exit 1 if $id eq '' or not $torows;
 
     my $orig_rows = $rrd->RRA_numrows($id);
 
@@ -502,6 +502,9 @@ if ($command eq "resize-rows-rra") {
     $rrd->resize_RRA($id, $torows);
     $rrd->save();
     $rrd->close();
+
+    # Recovery RRD
+    recovery($file);
     say "Number of rows changed";
     exit 0;
 }
