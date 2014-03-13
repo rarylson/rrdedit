@@ -392,6 +392,8 @@ my ($usage, $help, $file) = ('', '', '');
 my $full = '';
 # DS
 my ($name, $names) = ('', '');
+# DS Add
+my $dsstring = '';
 # DS Delete
 my ($ignore, $old, $new) = ('', '', '');
 # RRA
@@ -402,8 +404,8 @@ my $torows = '';
 my ($tostep, $with_add, $with_step, $with_interpolation, $schedule) = ('', '', '', '', '');
 # Parsing vars
 GetOptions ('usage' => \$usage, 'help' => \$help, 'file=s' => \$file, 'full' => \$full, 'name=s' => \$name, 
-        'ignore' => \$ignore, 'old=s' => \$old, 'new=s' => \$new, 'id=s' => \$id, 'torows=i' => \$torows, 
-        'tostep=i' => \$tostep, 'with-add' => \$with_add, 'with-step' => \$with_step, 
+        'string=s' => \$dsstring, 'ignore' => \$ignore, 'old=s' => \$old, 'new=s' => \$new, 'id=s' => \$id, 
+        'torows=i' => \$torows, 'tostep=i' => \$tostep, 'with-add' => \$with_add, 'with-step' => \$with_step, 
         'with-interpolation' => \$with_interpolation, 'schedule' => \$schedule);
 my @names = split(/,/,$name);
 my @ids = split(/,/,$id);
@@ -437,10 +439,33 @@ if ($command eq "print-ds") {
     exit 0;
 }    
 
+# Add data sources
+if ($command eq "add-ds") {
+    # Error
+    say "Syntax error. You must pass one DS string to be added." and usage($command) and
+            exit 1 if not $dsstring;
+    # Adding
+    say "Adding: $dsstring...";
+        # Print an error if dnname already exits. If '--ignore', continue.
+        # We print an error instead of die because occours an user input error, and not a logic error
+        # See: http://affy.blogspot.com.br/p5be/ch13.htm
+        $rrd->add_DS($dsstring);
+        #eval{$rrd->add_DS($dsstring);};
+        say "DS already exists or there is a syntax error in DS string" and 
+                exit 1 if $@ and not $ignore;
+    $rrd->save();
+    $rrd->close();
+    # After RRD::Editor->add_DS, the RRD header can be inconsistent, with a wrong size.
+    # So, recovery RRD
+    recovery($file);
+    say "DS added";
+    exit 0;
+}
+
 # Delete data sources
 if ($command eq "delete-ds") {
     # Error
-	say "Syntax error. You must pass one or more data source names to be deleted." and usage($command) and
+    say "Syntax error. You must pass one or more data source names to be deleted." and usage($command) and
             exit 1 if not @names;
     # Deleting
     say "Deleting: @names...";
@@ -482,7 +507,7 @@ if ($command eq "print-rra") {
             say $info if $info =~ /^rra/;
         }
     }
-	$rrd->close();
+    $rrd->close();
     exit 0;
 }    
 
