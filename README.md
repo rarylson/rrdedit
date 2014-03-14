@@ -23,7 +23,7 @@ Perl version 5.10.0 or newer (if you are using Ubuntu):
 
 RRDTool (if you are using Ubuntu):
 
-    apt-get install rrdtool
+    apt-get install rrdtool librrd-dev
 
 Perl Modules:
 
@@ -104,4 +104,4 @@ This plugin is very, very simple. We want to implement:
 
 - Convert between file formats (native-double, portable-double, portable-single)
 
-- Other operations with datasource and RRA
+- Other operations with datasource and RRA, including [to merge RRDs](https://bitbucket.org/ctheune/rrdmerge/overview)
